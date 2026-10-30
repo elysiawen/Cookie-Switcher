@@ -213,6 +213,31 @@ function buildCrx(zipBuf, privateKey) {
 
 /* ---------- 主流程 ---------- */
 
+/** 从 manifest 取出真实显示名：支持 __MSG_key__ 形式的本地化占位 */
+function extensionName(manifest) {
+  const raw = typeof manifest.name === 'string' ? manifest.name : 'extension';
+  const match = /^__MSG_(.+)__$/.exec(raw);
+  if (!match) return raw;
+
+  const key = match[1];
+  const locale = manifest.default_locale ?? 'en';
+  try {
+    const file = path.join(SRC, '_locales', locale, 'messages.json');
+    const messages = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return messages[key]?.message ?? key;
+  } catch {
+    return key;
+  }
+}
+
+function slugify(text) {
+  const slug = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'extension';
+}
+
 function main() {
   if (!fs.existsSync(SRC)) {
     console.error('未找到 dist/，请先执行 npm run build');
@@ -221,7 +246,8 @@ function main() {
 
   const manifest = JSON.parse(fs.readFileSync(path.join(SRC, 'manifest.json'), 'utf8'));
   const version = manifest.version ?? '0.0.0';
-  const stem = `cookie-profile-switcher-v${version}`;
+  // 文件名跟随 manifest 里的扩展名，改名后无需再动这个脚本
+  const stem = `${slugify(extensionName(manifest))}-v${version}`;
 
   const files = walk(SRC).sort();
   if (files.length === 0) {

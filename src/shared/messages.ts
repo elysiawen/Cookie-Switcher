@@ -1,4 +1,5 @@
 import type {
+  ClearSiteResult,
   ExportBundle,
   LockState,
   PanelState,
@@ -17,11 +18,13 @@ export type Request =
   | { type: 'SAVE_PROFILE'; name: string; scope: Scope; includeStorage: boolean }
   | { type: 'SWITCH_PROFILE'; id: string }
   | { type: 'DELETE_PROFILE'; id: string }
+  | { type: 'DELETE_PROFILES'; ids: string[] }
   | { type: 'RENAME_PROFILE'; id: string; name: string }
   | { type: 'GET_ALL_PROFILES' }
   | { type: 'EXPORT_DATA' }
   | { type: 'IMPORT_DATA'; payload: string; mode: 'merge' | 'replace' }
   | { type: 'CLEAR_ALL' }
+  | { type: 'CLEAR_SITE_COOKIES'; includeStorage?: boolean }
   | { type: 'GET_SETTINGS' }
   | { type: 'UPDATE_SETTINGS'; patch: Partial<Settings> }
   | { type: 'GET_LOCK_STATE' }
@@ -52,11 +55,13 @@ export type ResponseMap = {
   SAVE_PROFILE: SaveResult;
   SWITCH_PROFILE: SwitchResult;
   DELETE_PROFILE: { id: string };
+  DELETE_PROFILES: { deleted: number };
   RENAME_PROFILE: Profile;
   GET_ALL_PROFILES: Profile[];
   EXPORT_DATA: ExportBundle;
   IMPORT_DATA: { imported: number; total: number };
   CLEAR_ALL: { cleared: number };
+  CLEAR_SITE_COOKIES: ClearSiteResult;
   GET_SETTINGS: Settings;
   UPDATE_SETTINGS: Settings;
   GET_LOCK_STATE: LockState;

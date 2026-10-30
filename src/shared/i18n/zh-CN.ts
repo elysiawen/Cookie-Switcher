@@ -10,6 +10,13 @@ export const zhCN = {
   'common.loading': '正在读取…',
   'common.confirm': '确认',
 
+  'confirm.deleteTitle': '确认删除',
+  'confirm.deleteDesc': '「{name}」的 Cookie 快照会从本机删除，此操作不可撤销。',
+  'confirm.clearSiteTitle': '确认清除 Cookie',
+  'confirm.clearSiteDesc':
+    '将清除 {site} 下的全部 Cookie，相当于在当前网页登出；已保存的身份不受影响。',
+  'confirm.resetTitle': '确认重置',
+
   'time.justNow': '刚刚',
   'time.minutesAgo': '{n} 分钟前',
   'time.hoursAgo': '{n} 小时前',
@@ -38,7 +45,7 @@ export const zhCN = {
   'popup.unencrypted': '本地未加密',
   'popup.identityCount': '{count} 个身份',
   'popup.manageAll': '管理全部',
-  'popup.confirmDelete': '删除「{name}」？',
+
   'popup.saved': '已保存 {name}',
   'popup.savedCookies': '{count} cookies',
   'popup.savedLs': 'localStorage {count} 项',
@@ -49,6 +56,10 @@ export const zhCN = {
   'popup.lsSynced': 'localStorage 已同步',
   'popup.failedCount': '{count} 项失败：{error}',
   'popup.deleted': 'Profile 已删除',
+  'popup.clearSite': '清除本站 Cookie',
+  'popup.clearSiteDone': '已清除 {count} 个 cookie',
+  'popup.clearSiteStorage': '同时清理 localStorage',
+  'popup.clearSiteStorageDone': 'localStorage 清理 {count} 项',
 
   'menu.root': '切换Cookie',
   'menu.empty': '这个站点还没有保存的身份',
@@ -58,6 +69,8 @@ export const zhCN = {
   'banner.switchedManual': '成功切换到「{name}」，当前未开启自动刷新，请手动刷新网页',
   'banner.failed': '切换失败：{error}',
   'banner.locked': '已锁定，请先在扩展中解锁后再切换',
+  'banner.clearedReloading': '已清除本站 Cookie（{count} 个），正在刷新网页…',
+  'banner.clearedManual': '已清除本站 Cookie（{count} 个），请手动刷新网页',
 
   'panel.launcher': '切换Cookie',
   'panel.loading': '读取中…',
@@ -85,6 +98,10 @@ export const zhCN = {
   'options.export': '导出',
   'options.import': '导入',
   'options.clear': '清空',
+  'options.clearSiteTitle': '清空「{site}」的身份',
+  'options.clearSiteDesc':
+    '将删除该站点下的 {count} 个身份快照，浏览器里现有的 Cookie 不受影响。此操作无法撤销。',
+  'options.siteCleared': '已清空 {count} 个身份',
   'options.risk':
     '保存的 Cookie 等价于登录凭证。建议开启加密存储，导出文件请妥善保管，不要在共用电脑上使用。',
   'options.emptyTitle': '还没有任何身份',
@@ -182,11 +199,13 @@ export const zhCN = {
   'warn.noOrigin': '无法确定页面 origin，已跳过 localStorage',
   'warn.localStorageRead': 'localStorage 读取失败：{error}',
   'warn.localStorageWrite': 'localStorage 写入失败：{error}',
+  'warn.localStorageClear': 'localStorage 清理失败：{error}',
   'warn.storageOrigin': '快照的 localStorage 属于 {origin}，当前页面是 {current}，已跳过',
   'warn.parentCookies': '上级域 {parent} 还有 {count} 个 Cookie 未切换，登录态可能仍来自它们',
 
   'err.notWebPageSave': '当前标签页不是网页（http/https），无法读取 Cookie',
   'err.notWebPageSwitch': '当前标签页不是网页（http/https），无法切换',
+  'err.notWebPageClear': '当前标签页不是网页（http/https），无法清除 Cookie',
   'err.profileMissing': '该 Profile 已不存在，可能已被删除',
   'err.siteMismatch': '该 Profile 属于 {site}，与当前站点 {host} 不匹配',
   'err.emptyName': '名称不能为空',

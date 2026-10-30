@@ -8,6 +8,14 @@ export const enUS: Record<MessageKey, string> = {
   'common.loading': 'Loading…',
   'common.confirm': 'Confirm',
 
+  'confirm.deleteTitle': 'Delete profile',
+  'confirm.deleteDesc':
+    'The cookie snapshot of "{name}" will be deleted from this device. This cannot be undone.',
+  'confirm.clearSiteTitle': 'Clear site cookies',
+  'confirm.clearSiteDesc':
+    'All cookies of {site} will be removed, which signs you out of this site. Saved identities are not affected.',
+  'confirm.resetTitle': 'Reset lock',
+
   'time.justNow': 'just now',
   'time.minutesAgo': '{n} min ago',
   'time.hoursAgo': '{n} hr ago',
@@ -37,7 +45,7 @@ export const enUS: Record<MessageKey, string> = {
   'popup.unencrypted': 'Not encrypted',
   'popup.identityCount': '{count} identities',
   'popup.manageAll': 'Manage',
-  'popup.confirmDelete': 'Delete "{name}"?',
+
   'popup.saved': 'Saved {name}',
   'popup.savedCookies': '{count} cookies',
   'popup.savedLs': '{count} localStorage entries',
@@ -48,6 +56,10 @@ export const enUS: Record<MessageKey, string> = {
   'popup.lsSynced': 'localStorage synced',
   'popup.failedCount': '{count} failed: {error}',
   'popup.deleted': 'Profile deleted',
+  'popup.clearSite': 'Clear cookies for this site',
+  'popup.clearSiteDone': 'Cleared {count} cookies',
+  'popup.clearSiteStorage': 'Also clear localStorage',
+  'popup.clearSiteStorageDone': 'localStorage cleared ({count})',
 
   'menu.root': 'Switch cookie',
   'menu.empty': 'No saved identity for this site yet',
@@ -58,6 +70,9 @@ export const enUS: Record<MessageKey, string> = {
     'Switched to "{name}". Auto-reload is off, please refresh the page manually',
   'banner.failed': 'Switch failed: {error}',
   'banner.locked': 'Locked, unlock the extension before switching',
+  'banner.clearedReloading': 'Cleared {count} cookies for this site, reloading the page…',
+  'banner.clearedManual':
+    'Cleared {count} cookies for this site. Please refresh the page manually',
 
   'panel.launcher': 'Switch cookie',
   'panel.loading': 'Loading…',
@@ -85,6 +100,10 @@ export const enUS: Record<MessageKey, string> = {
   'options.export': 'Export',
   'options.import': 'Import',
   'options.clear': 'Clear',
+  'options.clearSiteTitle': 'Clear identities of "{site}"',
+  'options.clearSiteDesc':
+    'All {count} snapshots of this site will be deleted. Cookies in the browser are not affected. This cannot be undone.',
+  'options.siteCleared': 'Cleared {count} identities',
   'options.risk':
     'Saved cookies are equivalent to login credentials. Keep encryption on, guard exported files, and avoid shared computers.',
   'options.emptyTitle': 'No identities yet',
@@ -187,6 +206,7 @@ export const enUS: Record<MessageKey, string> = {
   'warn.noOrigin': 'Could not determine the page origin, skipped localStorage',
   'warn.localStorageRead': 'Failed to read localStorage: {error}',
   'warn.localStorageWrite': 'Failed to write localStorage: {error}',
+  'warn.localStorageClear': 'Failed to clear localStorage: {error}',
   'warn.storageOrigin':
     'The snapshot was taken on {origin} but this page is {current}, so it was skipped',
   'warn.parentCookies':
@@ -194,6 +214,7 @@ export const enUS: Record<MessageKey, string> = {
 
   'err.notWebPageSave': 'This tab is not an http/https page, cookies cannot be read',
   'err.notWebPageSwitch': 'This tab is not an http/https page, cannot switch',
+  'err.notWebPageClear': 'This tab is not an http/https page, cannot clear cookies',
   'err.profileMissing': 'This profile no longer exists, it may have been deleted',
   'err.siteMismatch': 'This profile belongs to {site}, which does not match {host}',
   'err.emptyName': 'Name cannot be empty',

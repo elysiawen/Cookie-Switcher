@@ -127,6 +127,16 @@ export interface SwitchResult {
   errors: string[];
 }
 
+/** 清除当前站点 cookie（相当于在当前网页登出，已保存的身份不受影响） */
+export interface ClearSiteResult {
+  cleared: number;
+  /** 一并清掉的 localStorage 条目数 */
+  storageCleared: number;
+  errors: string[];
+  /** 是否已安排自动刷新页面 */
+  reloading: boolean;
+}
+
 export interface SaveResult {
   ok: boolean;
   profile?: Profile;

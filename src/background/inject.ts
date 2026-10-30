@@ -21,6 +21,20 @@ export async function readLocalStorage(tabId: number): Promise<Record<string, st
   return value as Record<string, string>;
 }
 
+/** 清空当前页面的 localStorage，返回清掉的条目数 */
+export async function clearLocalStorage(tabId: number): Promise<number> {
+  const [injection] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      const count = window.localStorage.length;
+      window.localStorage.clear();
+      return count;
+    },
+  });
+  const value = injection?.result;
+  return typeof value === 'number' ? value : 0;
+}
+
 export async function writeLocalStorage(
   tabId: number,
   data: Record<string, string>,

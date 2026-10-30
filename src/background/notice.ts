@@ -41,9 +41,12 @@ function renderNotice(hostId: string, kind: string, text: string): void {
   const host = document.createElement('div');
   host.id = hostId;
   // 顶部居中的小浮窗，不再占用整条横幅
+  // 用 left/right 撑满再加 flex 居中：若只写 left: 50%，收缩宽度会被限制在半屏内，
+  // 手机上调换行的文案就会被挤成好几行
   host.style.cssText =
-    'all: initial; position: fixed; top: 14px; left: 50%; transform: translateX(-50%);' +
-    ' z-index: 2147483647;';
+    'all: initial; position: fixed; top: max(14px, env(safe-area-inset-top));' +
+    ' left: 0; right: 0; z-index: 2147483647; display: flex; justify-content: center;' +
+    ' padding: 0 16px; pointer-events: none;';
 
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
@@ -52,9 +55,13 @@ function renderNotice(hostId: string, kind: string, text: string): void {
         display: flex;
         align-items: center;
         gap: 8px;
-        max-width: min(460px, calc(100vw - 32px));
+        box-sizing: border-box;
+        /* 手机上铺满可用宽度，桌面上限 460px */
+        width: 100%;
+        max-width: 460px;
         padding: 9px 10px 9px 12px;
         border-radius: 12px;
+        pointer-events: auto;
         border: 1.5px solid ${stroke};
         /* 半透明底 + 高模糊背景，做出磨砂玻璃观感 */
         background: rgba(255, 255, 255, 0.58);
@@ -109,6 +116,17 @@ function renderNotice(hostId: string, kind: string, text: string): void {
         cursor: pointer;
       }
       .close:hover { opacity: 1; background: rgba(37, 99, 235, 0.12); }
+      /* 窄屏（手机）放宽排版，避免文字挤在一起 */
+      @media (max-width: 480px) {
+        .bar {
+          font-size: 14px;
+          gap: 10px;
+          padding: 11px 12px 11px 14px;
+          border-radius: 14px;
+        }
+        .badge { width: 20px; height: 20px; font-size: 12.5px; }
+        .close { width: 26px; height: 26px; font-size: 15px; }
+      }
       @keyframes cps-notice-in { to { opacity: 1; transform: none; } }
       @keyframes cps-notice-out { to { opacity: 0; transform: translateY(-8px); } }
     </style>

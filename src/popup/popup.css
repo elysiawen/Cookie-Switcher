@@ -1,5 +1,6 @@
 .pop {
-  width: 384px;
+  /* 桌面弹窗的视口宽度由内容撑开，这里不能用 vw/百分比做上限，否则会塌缩成竖条 */
+  width: 390px;
   max-height: 600px;
   display: flex;
   flex-direction: column;
@@ -71,13 +72,25 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: var(--text-3);
+  color: var(--text-2);
   flex: 0 0 auto;
+  transition: color 0.12s, background 0.12s;
 }
 
 .icon-btn:hover {
   background: var(--surface-2);
   color: var(--text);
+}
+
+.icon-btn.danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.icon-btn:disabled {
+  color: var(--border-strong);
+  cursor: not-allowed;
+  background: none;
 }
 
 /* ---------- banners ---------- */
@@ -105,7 +118,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
+  /* 外层不滚动，交给列表自己滚，这样顶部的保存按钮始终可见 */
+  overflow: hidden;
   flex: 1 1 auto;
   /* flex 子项默认 min-height:auto 会阻止收缩，导致 popup 溢出而不滚动 */
   min-height: 0;
@@ -150,7 +164,11 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  /* 身份一多就在这里滚动，横向仍裁掉圆角外的内容 */
+  overflow: hidden auto;
+  flex: 0 1 auto;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .row {
@@ -246,47 +264,6 @@
   background: #fbe0e0;
 }
 
-.row-confirm {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 9px 10px;
-  background: var(--danger-soft);
-}
-
-.confirm-text {
-  font-size: 12px;
-  color: var(--danger);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.confirm-actions {
-  display: flex;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-
-.mini {
-  padding: 4px 9px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 550;
-}
-
-.mini.ghost {
-  background: #fff;
-  border: 1px solid var(--border-strong);
-  color: var(--text-2);
-}
-
-.mini.danger {
-  background: var(--danger);
-  color: #fff;
-}
-
 /* ---------- spinner ---------- */
 .spinner {
   width: 14px;
@@ -307,6 +284,8 @@
 /* ---------- add ---------- */
 .add {
   width: 100%;
+  /* 不许被长列表挤压，滚动只发生在列表内部 */
+  flex: 0 0 auto;
   padding: 9px;
   display: flex;
   align-items: center;
@@ -337,16 +316,18 @@
   line-height: 1;
 }
 
-/* ---------- save panel ---------- */
-.save {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px;
+
+/* ---------- 弹窗内的表单 ---------- */
+.save-form {
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  box-shadow: var(--shadow-sm);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+/* 确认弹窗里的勾选项 */
+.confirm-check {
+  margin-bottom: 18px;
 }
 
 .field {
@@ -431,11 +412,7 @@
   cursor: not-allowed;
 }
 
-.save-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
+
 
 .btn {
   padding: 6px 14px;
@@ -498,9 +475,10 @@
 /* ---------- toast ---------- */
 .toast {
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: 46px;
+  /* 与页面内提示一致：顶部居中 */
+  top: 10px;
+  left: 10px;
+  right: 10px;
   z-index: 20;
   padding: 9px 11px;
   border-radius: 8px;
@@ -509,7 +487,7 @@
   background: #1b1e25;
   color: #fff;
   box-shadow: var(--shadow-md);
-  animation: rise 0.16s ease-out;
+  animation: toast-drop 0.16s ease-out;
 }
 
 .toast.ok {
@@ -524,10 +502,10 @@
   background: var(--warn);
 }
 
-@keyframes rise {
+@keyframes toast-drop {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(-8px);
   }
 }
 
@@ -592,26 +570,208 @@
   color: var(--text-2);
 }
 
-.lock-reset {
-  width: 100%;
-  margin-top: 16px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--danger-soft);
-  color: var(--danger);
-  font-size: 11.5px;
-}
 
-.lock-reset p {
-  margin: 0 0 8px;
-  line-height: 1.5;
-}
 
-.lock-reset-actions {
-  display: flex;
-  justify-content: space-between;
-}
+/* ---------- 触屏设备（手机端 Edge / Chrome） ---------- */
+/* 用指针类型而不是宽度判断：桌面弹窗视口本身就窄，媒体宽度查询会误伤 */
+@media (hover: none) and (pointer: coarse) {
+  .pop {
+    /* min-width / min-height 兜底：即便该媒体查询在桌面误命中，也不会塌缩成竖条 */
+    width: 100%;
+    min-width: 320px;
+    /* 手机端面板高度由浏览器给定，撑满它底栏才会贴到底部；旧内核用 vh 降级 */
+    height: 100vh;
+    height: 100dvh;
+    min-height: 420px;
+    /* 面板贴到屏幕底部时避开系统手势条 */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 
-.link.danger {
-  color: var(--danger);
+  .head {
+    padding: 14px 16px;
+  }
+
+  .host {
+    font-size: 15px;
+    max-width: 62vw;
+  }
+
+  .sub {
+    font-size: 12.5px;
+  }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .body {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .banner {
+    margin: 12px 14px 0;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .empty {
+    padding: 34px 16px 14px;
+  }
+
+  .empty-icon {
+    font-size: 32px;
+  }
+
+  .empty-title {
+    font-size: 15px;
+  }
+
+  .empty-desc {
+    font-size: 13px;
+  }
+
+  .row-main {
+    padding: 12px 6px 12px 12px;
+    gap: 12px;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+
+  .row-name {
+    font-size: 15px;
+  }
+
+  .row-meta {
+    font-size: 12.5px;
+  }
+
+  .row-del {
+    width: 40px;
+    height: 40px;
+    margin-right: 4px;
+  }
+
+  .add {
+    padding: 13px;
+    font-size: 14px;
+  }
+
+  .plus {
+    font-size: 17px;
+  }
+
+  .save-form {
+    gap: 14px;
+  }
+
+  .label {
+    font-size: 13px;
+  }
+
+  .input {
+    padding: 10px 12px;
+    /* 小于 16px 时 iOS/部分安卓输入框会聚焦放大 */
+    font-size: 16px;
+  }
+
+  .segment {
+    padding: 4px;
+  }
+
+  .seg {
+    padding: 9px 0;
+    font-size: 13.5px;
+  }
+
+  .hint,
+  .check em {
+    font-size: 12.5px;
+  }
+
+  .check {
+    font-size: 13.5px;
+    gap: 10px;
+  }
+
+  .check input {
+    width: 18px;
+    height: 18px;
+    margin-top: 0;
+  }
+
+  .btn {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+
+  .foot {
+    padding: 11px 16px;
+    font-size: 12.5px;
+  }
+
+  .link {
+    font-size: 12.5px;
+  }
+
+  .toast {
+    top: calc(12px + env(safe-area-inset-top));
+    left: 14px;
+    right: 14px;
+    padding: 11px 13px;
+    font-size: 13px;
+  }
+
+  .lock {
+    min-height: 340px;
+    padding: 34px 20px 28px;
+  }
+
+  .lock-title {
+    font-size: 16px;
+  }
+
+  .lock-desc {
+    font-size: 13px;
+  }
+
+  .lock-input {
+    font-size: 16px;
+  }
+
+  .lock-submit {
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  .lock-error,
+  .lock-forgot {
+    font-size: 12.5px;
+  }
+
+  /* 确认弹窗在手机上更宽松一些 */
+  .confirm-card {
+    max-width: none;
+    padding: 22px 20px 18px;
+  }
+
+  .confirm-title {
+    font-size: 16px;
+  }
+
+  .confirm-desc {
+    font-size: 13.5px;
+  }
+
+  .confirm-btn {
+    padding: 11px 18px;
+    font-size: 14px;
+  }
 }

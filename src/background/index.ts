@@ -24,7 +24,7 @@ import type {
   SwitchResult,
 } from '@/shared/types';
 import { applyCookies, clearCookies, collectCookies, countCookies, errorText } from './cookies';
-import { readLocalStorage, writeLocalStorage } from './inject';
+import { clearLocalStorage, readLocalStorage, writeLocalStorage } from './inject';
 import {
   getLockState,
   lockNow,
@@ -348,6 +348,20 @@ async function deleteProfile(id: string): Promise<{ id: string }> {
   return { id };
 }
 
+/** 批量删除（按站点清空时用），一次读写完成 */
+async function deleteProfiles(ids: string[]): Promise<{ deleted: number }> {
+  const remove = new Set(ids);
+  if (remove.size === 0) return { deleted: 0 };
+
+  return withLock(async () => {
+    const list = await loadProfiles();
+    const kept = list.filter((item) => !remove.has(item.id));
+    const deleted = list.length - kept.length;
+    if (deleted > 0) await persistProfiles(kept);
+    return { deleted };
+  });
+}
+
 async function renameProfile(id: string, name: string): Promise<Profile> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error(t('err.emptyName'));
@@ -542,6 +556,9 @@ async function handle(
     case 'DELETE_PROFILE':
       return { ok: true, data: await deleteProfile(request.id) };
 
+    case 'DELETE_PROFILES':
+      return { ok: true, data: await deleteProfiles(request.ids) };
+
     case 'RENAME_PROFILE':
       return { ok: true, data: await renameProfile(request.id, request.name) };
 
@@ -565,6 +582,56 @@ async function handle(
 
     case 'CLEAR_ALL':
       return { ok: true, data: { cleared: await withLock(clearAllData) } };
+
+    case 'CLEAR_SITE_COOKIES': {
+      // 相当于「在当前网页登出」：只清浏览器里的 cookie，不动已保存的身份
+      const tab = await getActiveTab();
+      const hostname = hostnameOf(tab?.url);
+      const site = hostname ? siteKeyFromHostname(hostname) : null;
+      const tabId = tab?.id;
+      if (typeof tabId !== 'number' || !site) {
+        return { ok: false, error: t('err.notWebPageClear') };
+      }
+
+      const outcome = await clearCookies(site, 'subdomains');
+      const errors = [...outcome.errors];
+      let storageCleared = 0;
+
+      if (request.includeStorage) {
+        try {
+          storageCleared = await clearLocalStorage(tabId);
+        } catch (error) {
+          // 某些页面禁止注入，清不掉 localStorage 不应该让整个操作失败
+          errors.push(t('warn.localStorageClear', { error: errorText(error) }));
+        }
+      }
+
+      const settings = await loadSettings();
+      const reloading = settings.reloadAfterSwitch;
+
+      await showPageNotice(
+        tabId,
+        errors.length > 0
+          ? { kind: 'error', text: t('banner.failed', { error: errors[0] }) }
+          : {
+              kind: 'ok',
+              text: reloading
+                ? t('banner.clearedReloading', { count: outcome.cleared })
+                : t('banner.clearedManual', { count: outcome.cleared }),
+            },
+      );
+
+      if (reloading) {
+        setTimeout(() => {
+          void reloadTabs(tabId, site, settings.reloadAllSiteTabs);
+        }, BEFORE_RELOAD_DELAY);
+      }
+
+      return {
+        ok: true,
+        data: { cleared: outcome.cleared, storageCleared, errors, reloading },
+      };
+    }
 
     case 'GET_SETTINGS':
       return { ok: true, data: await loadSettings() };

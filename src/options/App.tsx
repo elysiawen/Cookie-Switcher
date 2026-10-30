@@ -7,6 +7,7 @@ import {
   type LocalePreference,
 } from '@/shared/i18n';
 import { useI18n } from '@/shared/i18n/provider';
+import { Confirm } from '@/shared/Confirm';
 import { parseSiteRules } from '@/shared/access';
 import { LOCKED_ERROR, sendMessage } from '@/shared/messages';
 import {
@@ -146,6 +147,7 @@ export default function App() {
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [clearSite, setClearSite] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [busy, setBusy] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -233,6 +235,8 @@ export default function App() {
     [profiles],
   );
 
+  const deleteTarget = profiles.find((item) => item.id === confirmId) ?? null;
+
   const handleRename = async () => {
     if (!editing) return;
     const next = editing.name.trim();
@@ -251,6 +255,20 @@ export default function App() {
       return;
     }
     setToast({ kind: 'ok', text: t('options.renamed') });
+    await refresh();
+  };
+
+  const handleClearSite = async (site: string) => {
+    const ids = profiles.filter((item) => item.site === site).map((item) => item.id);
+    setClearSite(null);
+    if (ids.length === 0) return;
+
+    const result = await sendMessage<{ deleted: number }>({ type: 'DELETE_PROFILES', ids });
+    if (!result.ok) {
+      setToast({ kind: 'err', text: result.error });
+      return;
+    }
+    setToast({ kind: 'ok', text: t('options.siteCleared', { count: result.data.deleted }) });
     await refresh();
   };
 
@@ -542,6 +560,14 @@ export default function App() {
               <div className="group-head">
                 <span className="group-site">{site}</span>
                 <span className="group-count">{list.length}</span>
+                <button
+                  type="button"
+                  className="mini ghost group-clear"
+                  title={t('options.clearSiteTitle', { site })}
+                  onClick={() => setClearSite(site)}
+                >
+                  {t('options.clear')}
+                </button>
               </div>
               <div className="table">
                 <div className="thead">
@@ -599,32 +625,13 @@ export default function App() {
                     </span>
                     <span className="cell dim">{formatTime(profile.updatedAt, t)}</span>
                     <span className="cell actions">
-                      {confirmId === profile.id ? (
-                        <>
-                          <button
-                            type="button"
-                            className="mini ghost"
-                            onClick={() => setConfirmId(null)}
-                          >
-                            {t('common.cancel')}
-                          </button>
-                          <button
-                            type="button"
-                            className="mini danger"
-                            onClick={() => void handleDelete(profile.id)}
-                          >
-                            {t('common.delete')}
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="mini ghost"
-                          onClick={() => setConfirmId(profile.id)}
-                        >
-                          {t('common.delete')}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="mini ghost"
+                        onClick={() => setConfirmId(profile.id)}
+                      >
+                        {t('common.delete')}
+                      </button>
                     </span>
                   </div>
                 ))}
@@ -906,27 +913,41 @@ export default function App() {
         </div>
       )}
 
-      {confirmClear && (
-        <div className="modal-mask" onClick={() => setConfirmClear(false)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <h3>{t('options.clearTitle')}</h3>
-            <p className="modal-desc">{t('options.clearDesc', { count: profiles.length })}</p>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setConfirmClear(false)}>
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                className="btn danger"
-                disabled={busy}
-                onClick={() => void runClear()}
-              >
-                {t('options.clearConfirm')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Confirm
+        open={clearSite !== null}
+        title={t('options.clearSiteTitle', { site: clearSite ?? '' })}
+        desc={t('options.clearSiteDesc', {
+          site: clearSite ?? '',
+          count: profiles.filter((item) => item.site === clearSite).length,
+        })}
+        confirmText={t('common.delete')}
+        onCancel={() => setClearSite(null)}
+        onConfirm={() => {
+          if (clearSite) void handleClearSite(clearSite);
+        }}
+      />
+
+      <Confirm
+        open={deleteTarget !== null}
+        title={t('confirm.deleteTitle')}
+        desc={t('confirm.deleteDesc', { name: deleteTarget?.name ?? '' })}
+        confirmText={t('common.delete')}
+        onCancel={() => setConfirmId(null)}
+        onConfirm={() => {
+          if (deleteTarget) void handleDelete(deleteTarget.id);
+        }}
+      />
+
+      <Confirm
+        open={confirmClear}
+        title={t('options.clearTitle')}
+        desc={t('options.clearDesc', { count: profiles.length })}
+        confirmText={t('options.clearConfirm')}
+        onCancel={() => setConfirmClear(false)}
+        onConfirm={() => {
+          if (!busy) void runClear();
+        }}
+      />
 
       {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
     </div>

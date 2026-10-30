@@ -34,7 +34,7 @@ import {
   unlock,
 } from './lock';
 import { showPageNotice } from './notice';
-import { initQuickAccess, refreshContextMenu, syncQuickAccess } from './quickAccess';
+import { initQuickAccess, refreshContextMenu, refreshPanel, syncQuickAccess } from './quickAccess';
 import {
   alignStorageFormat,
   clearAllData,
@@ -578,10 +578,12 @@ async function handle(
         }
         return next;
       });
-      // 入口开关与语言变化都需要立刻重建菜单 / 重新注册脚本
+      // 入口开关、站点范围与语言变化都需要立刻重建菜单 / 重新校准悬浮窗
       if (
         request.patch.contextMenuEnabled !== undefined ||
         request.patch.floatingPanelEnabled !== undefined ||
+        request.patch.quickAccessScope !== undefined ||
+        request.patch.quickAccessSites !== undefined ||
         request.patch.locale !== undefined
       ) {
         // 设置已经落盘，入口同步失败不应该让保存操作报错
@@ -642,6 +644,7 @@ chrome.runtime.onMessage.addListener((message: Request, sender, sendResponse) =>
       sendResponse(result);
       if (result.ok && MENU_AFFECTING.includes(message.type)) {
         void refreshContextMenu().catch(() => undefined);
+        void refreshPanel().catch(() => undefined);
       }
     })
     .catch((error: unknown) => sendResponse({ ok: false, error: errorText(error) }));

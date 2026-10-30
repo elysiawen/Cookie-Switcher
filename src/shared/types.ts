@@ -49,6 +49,11 @@ export interface LockState {
   unlocked: boolean;
 }
 
+/** 快捷入口（右键菜单 / 悬浮窗）的生效范围 */
+export type QuickAccessScope = 'all' | 'whitelist' | 'blacklist';
+
+
+
 export interface Settings {
   /** 切换后自动刷新标签页 */
   reloadAfterSwitch: boolean;
@@ -62,6 +67,12 @@ export interface Settings {
   contextMenuEnabled: boolean;
   /** 网页内的悬浮窗快捷入口（默认关闭） */
   floatingPanelEnabled: boolean;
+  /** 快捷入口的生效范围 */
+  quickAccessScope: QuickAccessScope;
+  /** 范围规则里用到的域名，一行一个；子域自动包含 */
+  quickAccessSites: string[];
+  /** 页面悬浮窗缩放百分比（50-150，100 为标准尺寸） */
+  panelScale: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -71,6 +82,9 @@ export const DEFAULT_SETTINGS: Settings = {
   locale: 'auto',
   contextMenuEnabled: false,
   floatingPanelEnabled: false,
+  quickAccessScope: 'all',
+  quickAccessSites: [],
+  panelScale: 100,
 };
 
 export interface ActiveContext {

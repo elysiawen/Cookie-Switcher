@@ -50,7 +50,7 @@ export const zhCN = {
   'popup.failedCount': '{count} 项失败：{error}',
   'popup.deleted': 'Profile 已删除',
 
-  'menu.root': '切换身份',
+  'menu.root': '切换Cookie',
   'menu.empty': '这个站点还没有保存的身份',
   'menu.locked': '已锁定，请先在扩展中解锁',
 
@@ -59,8 +59,7 @@ export const zhCN = {
   'banner.failed': '切换失败：{error}',
   'banner.locked': '已锁定，请先在扩展中解锁后再切换',
 
-  'panel.launcher': '切换身份',
-  'panel.title': '切换身份',
+  'panel.launcher': '切换Cookie',
   'panel.loading': '读取中…',
   'panel.empty': '这个站点还没有保存的身份',
   'panel.meta': '{count} 个 cookie',
@@ -113,6 +112,22 @@ export const zhCN = {
   'options.floatingPanel': '页面悬浮窗',
   'options.floatingPanelDesc':
     '在网页角落显示一个可拖动的悬浮按钮，展开后直接切换身份。关闭后会从所有已打开的页面移除。',
+  'options.panelScale': '悬浮窗大小',
+  'options.panelScaleDesc': '拖动滑块调整悬浮按钮与展开卡片的尺寸，松手后立即生效。',
+  'options.quickAccessScope': '生效范围',
+  'options.quickAccessScopeDesc':
+    '决定右键菜单和悬浮窗在哪些网站上出现；「全部」只在已有保存身份的站点出现。',
+  'options.scopeAll': '全部',
+  'options.scopeWhitelist': '仅白名单',
+  'options.scopeBlacklist': '排除黑名单',
+  'options.sitesLabel': '站点列表',
+  'options.sitesHintWhitelist':
+    '每行一个域名，子域自动包含（如 example.com 覆盖 www.example.com）。',
+  'options.sitesHintBlacklist': '列表中的站点不显示快捷入口，其余网站照常显示。',
+  'options.sitesPlaceholder': 'example.com\ngithub.com',
+  'options.sitesSave': '保存列表',
+  'options.sitesSaved': '站点列表已保存',
+  'options.sitesEmptyWarn': '白名单为空时，任何网站都不会显示快捷入口。',
   'options.switchSettings': '切换设置',
   'options.reloadAfterSwitch': '切换后自动刷新页面',
   'options.reloadAfterSwitchDesc': '不刷新的话，页面内存里的旧登录态仍然生效。',
@@ -153,6 +168,8 @@ export const zhCN = {
   'options.note2': '「仅此域名」只处理当前主机名，上级域（如 .example.com）的 Cookie 不会被切换。',
   'options.note3': 'localStorage 按 origin 隔离，不跨子域；只有与快照 origin 一致时才会写入。',
   'options.note4': '数据只存在本机，不会上传；卸载扩展会一并删除。',
+  'options.note5':
+    '右键菜单与悬浮窗默认关闭，可在「快捷入口」里开启；范围选「全部」时只在已有保存身份的站点出现，白名单 / 黑名单按域名匹配并自动包含子域。',
   'options.version': '版本 {version}',
   'options.importTitle': '导入 {count} 个身份',
   'options.importMerge': '合并（保留现有）',

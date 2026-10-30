@@ -7,12 +7,14 @@ import {
   type LocalePreference,
 } from '@/shared/i18n';
 import { useI18n } from '@/shared/i18n/provider';
+import { parseSiteRules } from '@/shared/access';
 import { LOCKED_ERROR, sendMessage } from '@/shared/messages';
 import {
   DEFAULT_SETTINGS,
   type ExportBundle,
   type LockState,
   type Profile,
+  type QuickAccessScope,
   type Settings,
 } from '@/shared/types';
 
@@ -148,6 +150,9 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [siteDraft, setSiteDraft] = useState('');
+  const [scaleDraft, setScaleDraft] = useState(100);
+  const scaleTimer = useRef<number | null>(null);
   const [tab, setTab] = useState<'profiles' | 'settings'>(
     () => (window.location.hash === '#profiles' ? 'profiles' : 'settings'),
   );
@@ -188,6 +193,23 @@ export default function App() {
     const timer = window.setTimeout(() => setToast(null), 4000);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  const sitesText = (settings.quickAccessSites ?? []).join('\n');
+  useEffect(() => {
+    setSiteDraft(sitesText);
+  }, [sitesText]);
+
+  useEffect(() => {
+    setScaleDraft(settings.panelScale);
+  }, [settings.panelScale]);
+
+  // 拖动滑块时先本地预览，停手后再落盘，避免每移动一格就发一条消息
+  useEffect(
+    () => () => {
+      if (scaleTimer.current !== null) window.clearTimeout(scaleTimer.current);
+    },
+    [],
+  );
 
   const groups = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -320,6 +342,29 @@ export default function App() {
   const updateSettings = async (patch: Partial<Settings>) => {
     const result = await sendMessage<Settings>({ type: 'UPDATE_SETTINGS', patch });
     if (result.ok) setSettings(result.data);
+  };
+
+  const previewScale = (value: number) => {
+    setScaleDraft(value);
+    if (scaleTimer.current !== null) window.clearTimeout(scaleTimer.current);
+    scaleTimer.current = window.setTimeout(() => {
+      scaleTimer.current = null;
+      void updateSettings({ panelScale: value });
+    }, 220);
+  };
+
+  const saveSiteList = async () => {
+    const list = parseSiteRules(siteDraft);
+    const result = await sendMessage<Settings>({
+      type: 'UPDATE_SETTINGS',
+      patch: { quickAccessSites: list },
+    });
+    if (!result.ok) {
+      setToast({ kind: 'err', text: result.error });
+      return;
+    }
+    setSettings(result.data);
+    setToast({ kind: 'ok', text: t('options.sitesSaved') });
   };
 
   const toggleEncryption = async (next: boolean) => {
@@ -637,6 +682,73 @@ export default function App() {
             onChange={(next) => void updateSettings({ floatingPanelEnabled: next })}
           />
         </div>
+        <div className="setting">
+          <div>
+            <p className="setting-title">{t('options.panelScale')}</p>
+            <p className="setting-desc">{t('options.panelScaleDesc')}</p>
+          </div>
+          <div className="range-wrap">
+            <input
+              className="range"
+              type="range"
+              min={50}
+              max={150}
+              step={2}
+              value={scaleDraft}
+              aria-label={t('options.panelScale')}
+              onChange={(event) => previewScale(Number(event.target.value))}
+            />
+            <span className="range-value">{scaleDraft}%</span>
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <p className="setting-title">{t('options.quickAccessScope')}</p>
+            <p className="setting-desc">{t('options.quickAccessScopeDesc')}</p>
+          </div>
+          <select
+            className="select"
+            value={settings.quickAccessScope}
+            onChange={(event) =>
+              void updateSettings({ quickAccessScope: event.target.value as QuickAccessScope })
+            }
+          >
+            <option value="all">{t('options.scopeAll')}</option>
+            <option value="whitelist">{t('options.scopeWhitelist')}</option>
+            <option value="blacklist">{t('options.scopeBlacklist')}</option>
+          </select>
+        </div>
+        {settings.quickAccessScope !== 'all' && (
+          <div className="setting-block">
+            <p className="setting-title">{t('options.sitesLabel')}</p>
+            <textarea
+              className="sites-input"
+              spellCheck={false}
+              placeholder={t('options.sitesPlaceholder')}
+              value={siteDraft}
+              onChange={(event) => setSiteDraft(event.target.value)}
+            />
+            <p className="setting-desc">
+              {settings.quickAccessScope === 'whitelist'
+                ? t('options.sitesHintWhitelist')
+                : t('options.sitesHintBlacklist')}
+            </p>
+            {settings.quickAccessScope === 'whitelist' &&
+              (settings.quickAccessSites ?? []).length === 0 && (
+                <p className="setting-warn">{t('options.sitesEmptyWarn')}</p>
+              )}
+            <div className="sites-actions">
+              <button
+                type="button"
+                className="btn primary"
+                disabled={siteDraft === sitesText}
+                onClick={() => void saveSiteList()}
+              >
+                {t('options.sitesSave')}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="settings">
@@ -751,6 +863,7 @@ export default function App() {
             <li>{t('options.note2')}</li>
             <li>{t('options.note3')}</li>
             <li>{t('options.note4')}</li>
+            <li>{t('options.note5')}</li>
           </ul>
 
           <p className="about-version">

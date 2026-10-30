@@ -49,7 +49,7 @@ export const enUS: Record<MessageKey, string> = {
   'popup.failedCount': '{count} failed: {error}',
   'popup.deleted': 'Profile deleted',
 
-  'menu.root': 'Switch identity',
+  'menu.root': 'Switch cookie',
   'menu.empty': 'No saved identity for this site yet',
   'menu.locked': 'Locked, unlock the extension first',
 
@@ -59,8 +59,7 @@ export const enUS: Record<MessageKey, string> = {
   'banner.failed': 'Switch failed: {error}',
   'banner.locked': 'Locked, unlock the extension before switching',
 
-  'panel.launcher': 'Switch identity',
-  'panel.title': 'Switch identity',
+  'panel.launcher': 'Switch cookie',
   'panel.loading': 'Loading…',
   'panel.empty': 'No saved identity for this site yet',
   'panel.meta': '{count} cookies',
@@ -113,6 +112,24 @@ export const enUS: Record<MessageKey, string> = {
   'options.floatingPanel': 'Floating panel',
   'options.floatingPanelDesc':
     'Shows a draggable floating button on web pages for quick switching. Turning it off removes it from all open pages.',
+  'options.panelScale': 'Floating panel size',
+  'options.panelScaleDesc':
+    'Drag to resize the floating button and its card; applies as soon as you stop.',
+  'options.quickAccessScope': 'Enabled on',
+  'options.quickAccessScopeDesc':
+    'Controls which sites show the context menu entry and the floating panel. "All" only applies where an identity already exists.',
+  'options.scopeAll': 'All',
+  'options.scopeWhitelist': 'Whitelist only',
+  'options.scopeBlacklist': 'All except blacklist',
+  'options.sitesLabel': 'Site list',
+  'options.sitesHintWhitelist':
+    'One domain per line; subdomains are included (example.com covers www.example.com).',
+  'options.sitesHintBlacklist':
+    'Quick access is hidden on these sites and shown on every other site.',
+  'options.sitesPlaceholder': 'example.com\ngithub.com',
+  'options.sitesSave': 'Save list',
+  'options.sitesSaved': 'Site list saved',
+  'options.sitesEmptyWarn': 'An empty whitelist means no site will show quick access.',
   'options.switchSettings': 'Switching',
   'options.reloadAfterSwitch': 'Reload the page after switching',
   'options.reloadAfterSwitchDesc': 'Without a reload the old login state stays alive in memory.',
@@ -156,6 +173,8 @@ export const enUS: Record<MessageKey, string> = {
   'options.note3':
     'localStorage is isolated per origin, so it is only written when the page origin matches the snapshot.',
   'options.note4': 'Data never leaves this device. Uninstalling the extension deletes it.',
+  'options.note5':
+    'The context menu entry and floating panel are off by default and can be enabled under "Quick access". With the scope set to "All", they only appear on sites that already have an identity; whitelist and blacklist match by domain and include subdomains.',
   'options.version': 'Version {version}',
   'options.importTitle': 'Import {count} identities',
   'options.importMerge': 'Merge (keep existing)',

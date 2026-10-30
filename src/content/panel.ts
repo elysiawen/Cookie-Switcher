@@ -4,24 +4,44 @@
  * UI 全部放在 Shadow DOM 里，避免宿主页面的样式互相污染。
  */
 
+import { isQuickAccessAllowed } from '@/shared/access';
 import { createT, resolveLocale, type LocalePreference, type TFunc } from '@/shared/i18n';
-import { type ApiResult, type Request } from '@/shared/messages';
-import type { PanelState, Profile, SwitchResult } from '@/shared/types';
+import { PANEL_RECHECK, type ApiResult, type Request } from '@/shared/messages';
+import type { PanelState, Profile, QuickAccessScope, SwitchResult } from '@/shared/types';
 
 const HOST_ID = 'cps-panel-root';
 const POS_KEY = 'cps:panel-pos';
 const SETTINGS_KEY = 'cps:settings';
 
-const SIZE = 46;
-const MARGIN = 18;
-const GAP = 12;
+const MARGIN = 16;
+const GAP = 10;
 
-const STYLE = `
+/** 标准尺寸，实际尺寸 = 基准 × 缩放系数（用户可在设置里用滑块调 50%~150%） */
+const BASE_SIZE = 40;
+const BASE_CARD = 238;
+
+let size = BASE_SIZE;
+let cardWidth = BASE_CARD;
+let iconSize = 18;
+
+function applyScale(percent: number | undefined): void {
+  const value = typeof percent === 'number' && Number.isFinite(percent) ? percent : 100;
+  const factor = Math.min(1.5, Math.max(0.5, value / 100));
+  size = Math.round(BASE_SIZE * factor);
+  cardWidth = Math.round(BASE_CARD * factor);
+  iconSize = Math.round(18 * factor);
+}
+
+function buildStyle(): string {
+  const listMax = Math.round(208 * (size / BASE_SIZE));
+  const avatar = Math.round(22 * (size / BASE_SIZE));
+
+  return `
 :host { all: initial; }
 .wrap {
   position: fixed;
-  width: ${SIZE}px;
-  height: ${SIZE}px;
+  width: ${size}px;
+  height: ${size}px;
   z-index: 2147483000;
   font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "PingFang SC",
     "Microsoft YaHei", sans-serif;
@@ -31,8 +51,8 @@ const STYLE = `
 }
 .launcher {
   position: relative;
-  width: ${SIZE}px;
-  height: ${SIZE}px;
+  width: ${size}px;
+  height: ${size}px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -41,37 +61,37 @@ const STYLE = `
   color: #fff;
   cursor: grab;
   background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.32), 0 2px 6px rgba(16, 24, 40, 0.18);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.3), 0 2px 5px rgba(16, 24, 40, 0.16);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   touch-action: none;
 }
-.launcher:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(37, 99, 235, 0.38); }
+.launcher:hover { transform: translateY(-1px); box-shadow: 0 11px 24px rgba(37, 99, 235, 0.36); }
 .launcher:active { cursor: grabbing; }
-.launcher svg { display: block; pointer-events: none; }
+.launcher svg { display: block; pointer-events: none; width: ${iconSize}px; height: ${iconSize}px; }
 .count {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: #111827;
   color: #fff;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 16px;
   text-align: center;
   box-shadow: 0 0 0 2px #fff;
 }
 .count[hidden] { display: none; }
 .card {
   position: absolute;
-  width: 264px;
+  width: ${cardWidth}px;
   background: #fff;
   border: 1px solid rgba(16, 24, 40, 0.08);
-  border-radius: 14px;
-  box-shadow: 0 18px 44px rgba(16, 24, 40, 0.22);
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(16, 24, 40, 0.2);
   overflow: hidden;
   animation: cps-pop 0.14s ease-out;
 }
@@ -83,43 +103,43 @@ const STYLE = `
 .head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 10px 10px 13px;
+  gap: 6px;
+  padding: 8px 8px 8px 11px;
   border-bottom: 1px solid #f0f1f5;
 }
 .head-text { flex: 1; min-width: 0; }
 .site {
   display: block;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sub { display: block; font-size: 10.5px; color: #8a90a2; }
+
 .close {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: none;
   color: #8a90a2;
-  font-size: 16px;
-  line-height: 20px;
+  font-size: 15px;
+  line-height: 18px;
   cursor: pointer;
 }
 .close:hover { background: #f3f4f8; color: #1f2433; }
-.list { max-height: 238px; overflow-y: auto; padding: 6px; }
+.list { max-height: ${listMax}px; overflow-y: auto; padding: 5px; }
 .row {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
-  padding: 7px 8px;
+  padding: 6px 7px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: none;
   color: inherit;
   font: inherit;
@@ -130,47 +150,47 @@ const STYLE = `
 .row:disabled { cursor: default; opacity: 0.62; }
 .avatar {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: ${avatar}px;
+  height: ${avatar}px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
 }
 .row-text { flex: 1; min-width: 0; }
 .name {
   display: block;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 550;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.meta { display: block; font-size: 10.5px; color: #8a90a2; }
+.meta { display: block; font-size: 10px; color: #8a90a2; }
 .spinner {
   flex: 0 0 auto;
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   border: 2px solid #d8dee9;
   border-top-color: #2563eb;
   animation: cps-spin 0.7s linear infinite;
 }
 @keyframes cps-spin { to { transform: rotate(360deg); } }
-.empty { padding: 18px 12px; font-size: 12px; color: #8a90a2; text-align: center; }
+.empty { padding: 16px 10px; font-size: 11.5px; color: #8a90a2; text-align: center; }
 .foot {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px 7px 13px;
+  padding: 6px 8px 6px 11px;
   border-top: 1px solid #f0f1f5;
   background: #fafafd;
 }
 .status {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
+  font-size: 10.5px;
   color: #8a90a2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -178,21 +198,22 @@ const STYLE = `
 }
 .manage {
   flex: 0 0 auto;
-  padding: 3px 7px;
+  padding: 2px 6px;
   border: 0;
   border-radius: 6px;
   background: none;
   color: #2563eb;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
 }
 .manage:hover { background: #eaf2ff; }
 `;
+}
 
-const ICON = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
-  stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+const ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M4 8h14M15 5l3 3-3 3" />
   <path d="M20 16H6M9 13l-3 3 3 3" />
 </svg>`;
@@ -204,12 +225,12 @@ let card: HTMLElement | null = null;
 let listEl: HTMLElement | null = null;
 let statusEl: HTMLElement | null = null;
 let siteEl: HTMLElement | null = null;
-let subEl: HTMLElement | null = null;
 let countEl: HTMLElement | null = null;
 let manageBtn: HTMLButtonElement | null = null;
 
 let t: TFunc = createT('zh-CN');
 let localePref: LocalePreference = 'auto';
+let scalePref = 100;
 let data: PanelState | null = null;
 let busyId: string | null = null;
 let loading = false;
@@ -244,6 +265,9 @@ async function request<T>(message: Request): Promise<ApiResult<T>> {
 interface PanelSettings {
   floatingPanelEnabled?: boolean;
   locale?: LocalePreference;
+  quickAccessScope?: QuickAccessScope;
+  quickAccessSites?: string[];
+  panelScale?: number;
 }
 
 async function readSettings(): Promise<PanelSettings> {
@@ -262,8 +286,8 @@ async function applyLocale(): Promise<void> {
 }
 
 function clampPosition(left: number, top: number): { left: number; top: number } {
-  const maxLeft = Math.max(MARGIN, window.innerWidth - SIZE - MARGIN);
-  const maxTop = Math.max(MARGIN, window.innerHeight - SIZE - MARGIN);
+  const maxLeft = Math.max(MARGIN, window.innerWidth - size - MARGIN);
+  const maxTop = Math.max(MARGIN, window.innerHeight - size - MARGIN);
   return {
     left: Math.min(Math.max(MARGIN, left), maxLeft),
     top: Math.min(Math.max(MARGIN, top), maxTop),
@@ -281,12 +305,12 @@ function applyPosition(): void {
 /** 卡片始终贴在悬浮按钮内侧，避免超出可视区域 */
 function placeCard(): void {
   if (!card) return;
-  const alignRight = position.left + SIZE / 2 > window.innerWidth / 2;
-  const above = position.top + SIZE / 2 > window.innerHeight / 2;
+  const alignRight = position.left + size / 2 > window.innerWidth / 2;
+  const above = position.top + size / 2 > window.innerHeight / 2;
   card.style.left = alignRight ? 'auto' : '0px';
   card.style.right = alignRight ? '0px' : 'auto';
-  card.style.top = above ? 'auto' : `${SIZE + GAP}px`;
-  card.style.bottom = above ? `${SIZE + GAP}px` : 'auto';
+  card.style.top = above ? 'auto' : `${size + GAP}px`;
+  card.style.bottom = above ? `${size + GAP}px` : 'auto';
 }
 
 function setStatus(text: string): void {
@@ -295,7 +319,6 @@ function setStatus(text: string): void {
 
 function renderHeader(): void {
   if (siteEl) siteEl.textContent = data?.hostname ?? '';
-  if (subEl) subEl.textContent = data?.site ?? '';
   if (countEl) {
     const count = data?.profiles.length ?? 0;
     countEl.textContent = String(count);
@@ -494,12 +517,12 @@ function mount(): void {
 
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
-    <style>${STYLE}</style>
+    <style>${buildStyle()}</style>
     <div class="wrap">
       <button class="launcher" type="button">${ICON}<span class="count" hidden>0</span></button>
       <div class="card" hidden>
         <div class="head">
-          <div class="head-text"><span class="site"></span><span class="sub"></span></div>
+          <div class="head-text"><span class="site"></span></div>
           <button class="close" type="button">×</button>
         </div>
         <div class="list"></div>
@@ -513,7 +536,6 @@ function mount(): void {
   listEl = shadow.querySelector('.list');
   statusEl = shadow.querySelector('.status');
   siteEl = shadow.querySelector('.site');
-  subEl = shadow.querySelector('.sub');
   countEl = shadow.querySelector('.count');
   manageBtn = shadow.querySelector('.manage');
 
@@ -541,7 +563,6 @@ function destroy(): void {
   listEl = null;
   statusEl = null;
   siteEl = null;
-  subEl = null;
   countEl = null;
   manageBtn = null;
   data = null;
@@ -553,16 +574,24 @@ async function bootstrap(): Promise<void> {
 
   const settings = await readSettings();
   if (!settings.floatingPanelEnabled) return;
+  // 站点范围由设置决定，被排除的站点完全不渲染
+  if (!isQuickAccessAllowed(location.hostname, settings)) return;
 
   await applyLocale();
+  scalePref = settings.panelScale ?? 100;
+  applyScale(scalePref);
+
   const result = await request<PanelState>({ type: 'GET_PANEL_STATE' });
   if (!result.ok) return;
+
+  // 「全部网站」只对已有身份的站点显示，没有身份就不出悬浮窗
+  if ((settings.quickAccessScope ?? 'all') === 'all' && result.data.profiles.length === 0) return;
 
   data = result.data;
   mount();
   if (!host) return;
 
-  position = clampPosition(window.innerWidth - SIZE - MARGIN, window.innerHeight - SIZE - MARGIN);
+  position = clampPosition(window.innerWidth - size - MARGIN, window.innerHeight - size - MARGIN);
   try {
     const stored = (await chrome.storage.local.get(POS_KEY))[POS_KEY] as
       | { left?: number; top?: number }
@@ -580,6 +609,22 @@ async function bootstrap(): Promise<void> {
   renderRows();
 }
 
+/** 身份数据变化后重新判断：该出现就出现，该消失就消失 */
+async function recheck(): Promise<void> {
+  const settings = await readSettings();
+  const allowed =
+    settings.floatingPanelEnabled === true &&
+    isQuickAccessAllowed(location.hostname, settings);
+
+  destroy();
+  if (!allowed) return;
+  await bootstrap();
+}
+
+chrome.runtime.onMessage.addListener((message: { type?: string } | undefined) => {
+  if (message?.type === PANEL_RECHECK) void recheck();
+});
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
   const next = changes[SETTINGS_KEY]?.newValue as PanelSettings | undefined;
@@ -589,12 +634,22 @@ chrome.storage.onChanged.addListener((changes, area) => {
     destroy();
     return;
   }
+  // 站点范围变化：被排除的立即卸载，刚被放行的立即挂载
+  if (!isQuickAccessAllowed(location.hostname, next)) {
+    destroy();
+    return;
+  }
   if (next.floatingPanelEnabled === true && !host) {
     void bootstrap();
     return;
   }
-  // 设置每次都整份写回，只有语言真的变了才重绘，避免面板被意外收起
+  // 设置每次都整份写回，只有真正影响外观的项变了才重绘，避免面板被意外收起
   if (next.locale !== undefined && next.locale !== localePref) {
+    destroy();
+    void bootstrap();
+    return;
+  }
+  if (next.panelScale !== undefined && next.panelScale !== scalePref) {
     destroy();
     void bootstrap();
   }

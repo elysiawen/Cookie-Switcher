@@ -368,7 +368,7 @@ export default function App() {
               {context?.hostname ?? t('popup.noPage')}
             </span>
             <span className="sub">
-              {context?.site ? `${context.site} · ` : ''}
+              {/* 主标题已经是域名，这里只展示 cookie 数量，不再重复站点 */}
               {t('popup.cookieCount', { count: context?.liveCookieCount ?? 0 })}
             </span>
           </div>

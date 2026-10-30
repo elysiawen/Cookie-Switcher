@@ -75,7 +75,20 @@ export async function persistProfiles(profiles: Profile[]): Promise<void> {
 export async function loadSettings(): Promise<Settings> {
   const raw = await chrome.storage.local.get(SETTINGS_KEY);
   const value = raw[SETTINGS_KEY];
-  return { ...DEFAULT_SETTINGS, ...(value as Partial<Settings> | undefined) };
+  const settings = { ...DEFAULT_SETTINGS, ...(value as Partial<Settings> | undefined) };
+  // 站点列表可能来自旧版本或被手工改坏，这里兜一下底
+  if (!Array.isArray(settings.quickAccessSites)) settings.quickAccessSites = [];
+
+  // 悬浮窗尺寸早期是三档枚举（small / medium / large），统一迁移成百分比
+  const scale = settings.panelScale as unknown;
+  if (typeof scale === 'string') {
+    const legacy: Record<string, number> = { small: 86, medium: 100, large: 116 };
+    settings.panelScale = legacy[scale] ?? 100;
+  } else if (typeof scale !== 'number' || !Number.isFinite(scale)) {
+    settings.panelScale = 100;
+  }
+  settings.panelScale = Math.min(150, Math.max(50, Math.round(settings.panelScale)));
+  return settings;
 }
 
 export async function persistSettings(patch: Partial<Settings>): Promise<Settings> {

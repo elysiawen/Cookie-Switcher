@@ -9,9 +9,11 @@
  * 这些时机都发生在右键菜单弹出之前。
  */
 
+import { isQuickAccessAllowed } from '@/shared/access';
 import { hostnameFromUrl, profileCoversHostname } from '@/shared/domain';
 import { resolveCurrentLocale, setRuntimeLocale, t } from '@/shared/i18n';
-import type { Profile } from '@/shared/types';
+import { PANEL_RECHECK } from '@/shared/messages';
+import type { Profile, Settings } from '@/shared/types';
 import { getLockState } from './lock';
 import { loadProfiles, loadSettings } from './storage';
 
@@ -75,7 +77,7 @@ function matchProfiles(profiles: Profile[], hostname: string): Profile[] {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-/** 按设置与当前页面重建菜单；关闭设置时只有「移除」这一步 */
+/** 按设置与当前页面重建菜单；关闭设置或站点被排除时只有「移除」这一步 */
 async function rebuildMenu(hostOverride?: string | null): Promise<void> {
   const settings = await loadSettings();
   setRuntimeLocale(await resolveCurrentLocale());
@@ -85,6 +87,11 @@ async function rebuildMenu(hostOverride?: string | null): Promise<void> {
   if (!settings.contextMenuEnabled) return;
 
   const hostname = hostOverride === undefined ? await currentHostname() : hostOverride;
+  if (!hostname || !isQuickAccessAllowed(hostname, settings)) return;
+
+  const matched = matchProfiles(await loadProfiles(), hostname);
+  // 「全部网站」只对已有身份的站点显示，没有身份就完全不出现
+  if (settings.quickAccessScope === 'all' && matched.length === 0) return;
 
   await createMenu({
     id: ROOT_MENU_ID,
@@ -96,7 +103,7 @@ async function rebuildMenu(hostOverride?: string | null): Promise<void> {
 
   const lock = await getLockState();
   const locked = lock.enabled && !lock.unlocked;
-  const profiles = locked || !hostname ? [] : matchProfiles(await loadProfiles(), hostname);
+  const profiles = locked ? [] : matched;
 
   const items: chrome.contextMenus.CreateProperties[] = [];
   if (locked) {
@@ -135,12 +142,19 @@ async function removePanel(tabId: number): Promise<void> {
 }
 
 /** 让已打开的页面立刻获得 / 失去悬浮窗，未打开的页面由注册状态决定 */
-async function applyPanelToOpenTabs(enabled: boolean): Promise<void> {
+async function applyPanelToOpenTabs(enabled: boolean, settings?: Settings): Promise<void> {
   const tabs = await chrome.tabs.query({ url: PAGE_MATCHES });
   await Promise.all(
     tabs
       .filter((tab) => typeof tab.id === 'number')
-      .map((tab) => (enabled ? injectPanel(tab.id as number) : removePanel(tab.id as number))),
+      .map((tab) => {
+        const tabId = tab.id as number;
+        if (!enabled) return removePanel(tabId);
+        const hostname = hostnameFromUrl(tab.url);
+        return isQuickAccessAllowed(hostname, settings ?? {})
+          ? injectPanel(tabId)
+          : removePanel(tabId);
+      }),
   );
 }
 
@@ -152,7 +166,14 @@ async function syncPanelRegistration(): Promise<void> {
   });
   const isOn = registered.some((script) => script.id === PANEL_SCRIPT_ID);
 
-  if (settings.floatingPanelEnabled && !isOn) {
+  if (!settings.floatingPanelEnabled) {
+    if (!isOn) return;
+    await chrome.scripting.unregisterContentScripts({ ids: [PANEL_SCRIPT_ID] });
+    await applyPanelToOpenTabs(false);
+    return;
+  }
+
+  if (!isOn) {
     await chrome.scripting.registerContentScripts([
       {
         id: PANEL_SCRIPT_ID,
@@ -163,20 +184,32 @@ async function syncPanelRegistration(): Promise<void> {
         persistAcrossSessions: true,
       },
     ]);
-    await applyPanelToOpenTabs(true);
-    return;
   }
-
-  if (!settings.floatingPanelEnabled && isOn) {
-    await chrome.scripting.unregisterContentScripts({ ids: [PANEL_SCRIPT_ID] });
-    await applyPanelToOpenTabs(false);
-  }
+  // 每次同步都按最新范围校准已打开的标签页（范围规则可能变了）
+  await applyPanelToOpenTabs(true, settings);
 }
 
 /** 只重建菜单，用于标签页切换、数据变更等高频场景 */
 export function refreshContextMenu(hostOverride?: string | null): Promise<void> {
   return enqueue(async () => {
     await rebuildMenu(hostOverride);
+  });
+}
+
+/** 身份数据变了：让已打开页面的悬浮窗重新判断是否需要出现 */
+export function refreshPanel(): Promise<void> {
+  return enqueue(async () => {
+    const settings = await loadSettings();
+    if (!settings.floatingPanelEnabled) return;
+
+    const tabs = await chrome.tabs.query({ url: PAGE_MATCHES });
+    await Promise.all(
+      tabs.map(async (tab) => {
+        if (typeof tab.id !== 'number') return;
+        if (!isQuickAccessAllowed(hostnameFromUrl(tab.url), settings)) return;
+        await chrome.tabs.sendMessage(tab.id, { type: PANEL_RECHECK }).catch(() => undefined);
+      }),
+    );
   });
 }
 

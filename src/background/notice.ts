@@ -35,14 +35,15 @@ function renderNotice(hostId: string, kind: string, text: string): void {
   if (previous) previous.remove();
 
   const failed = kind === 'error';
-  const from = failed ? '#dc2626' : '#2563eb';
-  const to = failed ? '#b91c1c' : '#1d4ed8';
+  const stroke = failed ? '#dc2626' : '#2563eb';
   const glyph = failed ? '!' : '✓';
 
   const host = document.createElement('div');
   host.id = hostId;
+  // 顶部居中的小浮窗，不再占用整条横幅
   host.style.cssText =
-    'all: initial; position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647;';
+    'all: initial; position: fixed; top: 14px; left: 50%; transform: translateX(-50%);' +
+    ' z-index: 2147483647;';
 
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
@@ -50,17 +51,31 @@ function renderNotice(hostId: string, kind: string, text: string): void {
       .bar {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 10px 14px;
-        color: #fff;
-        background: linear-gradient(135deg, ${from}, ${to});
-        box-shadow: 0 6px 20px rgba(16, 24, 40, 0.2);
-        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+        gap: 8px;
+        max-width: min(460px, calc(100vw - 32px));
+        padding: 9px 10px 9px 12px;
+        border-radius: 12px;
+        border: 1.5px solid ${stroke};
+        /* 半透明底 + 高模糊背景，做出磨砂玻璃观感 */
+        background: rgba(255, 255, 255, 0.58);
+        -webkit-backdrop-filter: blur(22px) saturate(170%);
+        backdrop-filter: blur(22px) saturate(170%);
+        box-shadow:
+          0 12px 32px rgba(16, 24, 40, 0.16),
+          0 2px 6px rgba(16, 24, 40, 0.06),
+          inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        color: #14161a;
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
           "PingFang SC", "Microsoft YaHei", sans-serif;
-        transform: translateY(-100%);
-        animation: cps-notice-in 0.2s ease-out forwards;
+        opacity: 0;
+        transform: translateY(-8px);
+        animation: cps-notice-in 0.18s ease-out forwards;
       }
-      .bar.out { animation: cps-notice-out 0.2s ease-in forwards; }
+      /* 不支持 backdrop-filter 时退化为接近实心的白底 */
+      @supports not (backdrop-filter: blur(1px)) {
+        .bar { background: rgba(255, 255, 255, 0.94); }
+      }
+      .bar.out { animation: cps-notice-out 0.16s ease-in forwards; }
       .badge {
         flex: 0 0 auto;
         width: 18px;
@@ -68,36 +83,34 @@ function renderNotice(hostId: string, kind: string, text: string): void {
         border-radius: 50%;
         display: grid;
         place-items: center;
-        background: rgba(255, 255, 255, 0.22);
-        font-size: 12px;
+        background: ${stroke};
+        color: #fff;
+        font-size: 11.5px;
         font-weight: 700;
       }
       .text {
         flex: 1;
         min-width: 0;
         font-weight: 550;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }
       .close {
         flex: 0 0 auto;
-        width: 22px;
-        height: 22px;
+        width: 20px;
+        height: 20px;
         padding: 0;
         border: 0;
-        border-radius: 6px;
+        border-radius: 5px;
         background: none;
-        color: #fff;
+        color: #5c6472;
         font: inherit;
-        font-size: 15px;
+        font-size: 14px;
         line-height: 1;
-        opacity: 0.8;
+        opacity: 0.75;
         cursor: pointer;
       }
-      .close:hover { opacity: 1; background: rgba(255, 255, 255, 0.16); }
-      @keyframes cps-notice-in { to { transform: none; } }
-      @keyframes cps-notice-out { to { transform: translateY(-100%); opacity: 0; } }
+      .close:hover { opacity: 1; background: rgba(37, 99, 235, 0.12); }
+      @keyframes cps-notice-in { to { opacity: 1; transform: none; } }
+      @keyframes cps-notice-out { to { opacity: 0; transform: translateY(-8px); } }
     </style>
     <div class="bar" role="status">
       <span class="badge">${glyph}</span>

@@ -36,6 +36,9 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 /** 后台在未解锁状态下返回的统一错误码 */
 export const LOCKED_ERROR = 'LOCKED';
 
+/** 后台通知页面重新评估悬浮窗（身份或设置变化时使用） */
+export const PANEL_RECHECK = 'cps:panel-recheck';
+
 export function sendMessage<T>(request: Request): Promise<ApiResult<T>> {
   return chrome.runtime.sendMessage(request) as Promise<ApiResult<T>>;
 }

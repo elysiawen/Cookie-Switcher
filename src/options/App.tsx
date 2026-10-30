@@ -14,6 +14,7 @@ import {
   DEFAULT_SETTINGS,
   type ExportBundle,
   type LockState,
+  type PanelCorner,
   type Profile,
   type QuickAccessScope,
   type Settings,
@@ -371,6 +372,19 @@ export default function App() {
     }, 220);
   };
 
+  const resetPanelPosition = async () => {
+    const result = await sendMessage<Settings>({
+      type: 'UPDATE_SETTINGS',
+      patch: { panelCorner: DEFAULT_SETTINGS.panelCorner },
+    });
+    if (!result.ok) {
+      setToast({ kind: 'err', text: result.error });
+      return;
+    }
+    setSettings(result.data);
+    setToast({ kind: 'ok', text: t('options.panelPositionResetDone') });
+  };
+
   const saveSiteList = async () => {
     const list = parseSiteRules(siteDraft);
     const result = await sendMessage<Settings>({
@@ -458,20 +472,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <span className="logo">
-            <svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true">
-              <defs>
-                <linearGradient id="cps-logo" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#3b82f6" />
-                  <stop offset="1" stopColor="#1d4ed8" />
-                </linearGradient>
-              </defs>
-              <rect width="64" height="64" rx="15" fill="url(#cps-logo)" />
-              <circle cx="32" cy="32" r="18.5" fill="#ffffff" />
-              <circle cx="25" cy="25" r="3.1" fill="#2563eb" />
-              <circle cx="39" cy="26.5" r="2.4" fill="#2563eb" />
-              <circle cx="37.5" cy="39" r="3.1" fill="#2563eb" />
-              <circle cx="26" cy="39.5" r="2.2" fill="#2563eb" />
-            </svg>
+            <img src="./icons/icon128.png" width="40" height="40" alt="" />
           </span>
           <div>
             <h1>Cookie Switcher</h1>
@@ -706,6 +707,29 @@ export default function App() {
               onChange={(event) => previewScale(Number(event.target.value))}
             />
             <span className="range-value">{scaleDraft}%</span>
+          </div>
+        </div>
+        <div className="setting">
+          <div>
+            <p className="setting-title">{t('options.panelPosition')}</p>
+            <p className="setting-desc">{t('options.panelPositionDesc')}</p>
+          </div>
+          <div className="pos-controls">
+            <select
+              className="select"
+              value={settings.panelCorner}
+              onChange={(event) =>
+                void updateSettings({ panelCorner: event.target.value as PanelCorner })
+              }
+            >
+              <option value="top-left">{t('options.panelCornerTopLeft')}</option>
+              <option value="top-right">{t('options.panelCornerTopRight')}</option>
+              <option value="bottom-left">{t('options.panelCornerBottomLeft')}</option>
+              <option value="bottom-right">{t('options.panelCornerBottomRight')}</option>
+            </select>
+            <button type="button" className="btn" onClick={() => void resetPanelPosition()}>
+              {t('options.panelPositionReset')}
+            </button>
           </div>
         </div>
         <div className="setting">

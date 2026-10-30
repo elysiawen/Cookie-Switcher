@@ -52,6 +52,9 @@ export interface LockState {
 /** 快捷入口（右键菜单 / 悬浮窗）的生效范围 */
 export type QuickAccessScope = 'all' | 'whitelist' | 'blacklist';
 
+/** 悬浮窗默认停靠的角落 */
+export type PanelCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
 
 
 export interface Settings {
@@ -73,6 +76,8 @@ export interface Settings {
   quickAccessSites: string[];
   /** 页面悬浮窗缩放百分比（50-150，100 为标准尺寸） */
   panelScale: number;
+  /** 悬浮窗默认停靠的角落；拖动后会记住手动位置，恢复默认即回到这里 */
+  panelCorner: PanelCorner;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -85,7 +90,11 @@ export const DEFAULT_SETTINGS: Settings = {
   quickAccessScope: 'all',
   quickAccessSites: [],
   panelScale: 100,
+  panelCorner: 'bottom-right',
 };
+
+/** 悬浮窗拖动后的手动位置存于 chrome.storage.local；清除它即可回到默认角落 */
+export const PANEL_POS_KEY = 'cps:panel-pos';
 
 export interface ActiveContext {
   tabId: number | null;

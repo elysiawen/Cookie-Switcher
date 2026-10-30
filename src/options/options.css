@@ -28,9 +28,10 @@
   place-items: center;
 }
 
-.logo svg {
+.logo img {
   display: block;
-  filter: drop-shadow(0 2px 6px rgba(37, 99, 235, 0.28));
+  border-radius: 10px;
+  filter: drop-shadow(0 2px 6px rgba(120, 80, 20, 0.18));
 }
 
 .brand h1 {
@@ -582,6 +583,17 @@
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+.pos-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.pos-controls .select {
+  min-width: 150px;
+}
+
 .switch {
   position: relative;
   width: 36px;
@@ -989,6 +1001,16 @@
     min-width: 0;
     padding: 10px 12px;
     font-size: 15px;
+  }
+
+  .pos-controls {
+    width: 100%;
+  }
+
+  .pos-controls .select {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
   }
 
   .sites-input {

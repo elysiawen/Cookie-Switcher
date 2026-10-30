@@ -10,18 +10,19 @@ import {
 } from '@/shared/domain';
 import { resolveCurrentLocale, setRuntimeLocale, t } from '@/shared/i18n';
 import { LOCKED_ERROR, type Request } from '@/shared/messages';
-import type {
-  ActiveContext,
-  CookieRecord,
-  ExportBundle,
-  LockState,
-  PanelState,
-  PopupState,
-  Profile,
-  SaveResult,
-  Scope,
-  StorageSnapshot,
-  SwitchResult,
+import {
+  PANEL_POS_KEY,
+  type ActiveContext,
+  type CookieRecord,
+  type ExportBundle,
+  type LockState,
+  type PanelState,
+  type PopupState,
+  type Profile,
+  type SaveResult,
+  type Scope,
+  type StorageSnapshot,
+  type SwitchResult,
 } from '@/shared/types';
 import { applyCookies, clearCookies, collectCookies, countCookies, errorText } from './cookies';
 import { clearLocalStorage, readLocalStorage, writeLocalStorage } from './inject';
@@ -645,6 +646,10 @@ async function handle(
         }
         return next;
       });
+      // 悬浮窗位置改变时清掉手动拖动记录，让已打开的页面回到所选角落
+      if (request.patch.panelCorner !== undefined) {
+        await chrome.storage.local.remove(PANEL_POS_KEY).catch(() => undefined);
+      }
       // 入口开关、站点范围与语言变化都需要立刻重建菜单 / 重新校准悬浮窗
       if (
         request.patch.contextMenuEnabled !== undefined ||

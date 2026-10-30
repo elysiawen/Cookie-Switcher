@@ -1,9 +1,10 @@
 import { enUS } from './en-US';
+import { jaJP } from './ja-JP';
 import { zhCN, type MessageKey } from './zh-CN';
 
 export type { MessageKey };
 
-export const SUPPORTED_LOCALES = ['zh-CN', 'en-US'] as const;
+export const SUPPORTED_LOCALES = ['zh-CN', 'en-US', 'ja-JP'] as const;
 export type ResolvedLocale = (typeof SUPPORTED_LOCALES)[number];
 export type LocalePreference = 'auto' | ResolvedLocale;
 
@@ -13,11 +14,13 @@ export const FALLBACK_LOCALE: ResolvedLocale = 'zh-CN';
 export const LOCALE_LABELS: Record<ResolvedLocale, string> = {
   'zh-CN': '简体中文',
   'en-US': 'English',
+  'ja-JP': '日本語',
 };
 
 const DICTIONARIES: Record<ResolvedLocale, Record<MessageKey, string>> = {
   'zh-CN': zhCN,
   'en-US': enUS,
+  'ja-JP': jaJP,
 };
 
 export type TParams = Record<string, string | number>;
@@ -43,6 +46,7 @@ export function detectBrowserLocale(): ResolvedLocale {
   }
   if (!ui && typeof navigator !== 'undefined') ui = navigator.language.toLowerCase();
   if (ui.startsWith('zh')) return 'zh-CN';
+  if (ui.startsWith('ja')) return 'ja-JP';
   return 'en-US';
 }
 

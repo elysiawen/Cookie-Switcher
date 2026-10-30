@@ -131,6 +131,15 @@ export const zhCN = {
     '在网页角落显示一个可拖动的悬浮按钮，展开后直接切换身份。关闭后会从所有已打开的页面移除。',
   'options.panelScale': '悬浮窗大小',
   'options.panelScaleDesc': '拖动滑块调整悬浮按钮与展开卡片的尺寸，松手后立即生效。',
+  'options.panelPosition': '悬浮窗位置',
+  'options.panelPositionDesc':
+    '选择悬浮窗默认停靠的角落；在网页上拖动后会记住手动位置，点「恢复默认位置」即可回到这里。',
+  'options.panelCornerTopLeft': '左上',
+  'options.panelCornerTopRight': '右上',
+  'options.panelCornerBottomLeft': '左下',
+  'options.panelCornerBottomRight': '右下',
+  'options.panelPositionReset': '恢复默认位置',
+  'options.panelPositionResetDone': '悬浮窗位置已恢复默认',
   'options.quickAccessScope': '生效范围',
   'options.quickAccessScopeDesc':
     '决定右键菜单和悬浮窗在哪些网站上出现；「全部」只在已有保存身份的站点出现。',

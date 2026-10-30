@@ -134,6 +134,15 @@ export const enUS: Record<MessageKey, string> = {
   'options.panelScale': 'Floating panel size',
   'options.panelScaleDesc':
     'Drag to resize the floating button and its card; applies as soon as you stop.',
+  'options.panelPosition': 'Floating panel position',
+  'options.panelPositionDesc':
+    'Pick the corner where the floating panel docks by default. Dragging it remembers a manual position; use "Reset position" to bring it back here.',
+  'options.panelCornerTopLeft': 'Top left',
+  'options.panelCornerTopRight': 'Top right',
+  'options.panelCornerBottomLeft': 'Bottom left',
+  'options.panelCornerBottomRight': 'Bottom right',
+  'options.panelPositionReset': 'Reset position',
+  'options.panelPositionResetDone': 'Floating panel position reset',
   'options.quickAccessScope': 'Enabled on',
   'options.quickAccessScopeDesc':
     'Controls which sites show the context menu entry and the floating panel. "All" only applies where an identity already exists.',

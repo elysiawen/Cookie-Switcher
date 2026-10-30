@@ -7,10 +7,16 @@
 import { isQuickAccessAllowed } from '@/shared/access';
 import { createT, resolveLocale, type LocalePreference, type TFunc } from '@/shared/i18n';
 import { PANEL_RECHECK, type ApiResult, type Request } from '@/shared/messages';
-import type { PanelState, Profile, QuickAccessScope, SwitchResult } from '@/shared/types';
+import {
+  PANEL_POS_KEY as POS_KEY,
+  type PanelCorner,
+  type PanelState,
+  type Profile,
+  type QuickAccessScope,
+  type SwitchResult,
+} from '@/shared/types';
 
 const HOST_ID = 'cps-panel-root';
-const POS_KEY = 'cps:panel-pos';
 const SETTINGS_KEY = 'cps:settings';
 
 const MARGIN = 16;
@@ -231,6 +237,7 @@ let manageBtn: HTMLButtonElement | null = null;
 let t: TFunc = createT('zh-CN');
 let localePref: LocalePreference = 'auto';
 let scalePref = 100;
+let cornerPref: PanelCorner = 'bottom-right';
 let data: PanelState | null = null;
 let busyId: string | null = null;
 let loading = false;
@@ -268,6 +275,7 @@ interface PanelSettings {
   quickAccessScope?: QuickAccessScope;
   quickAccessSites?: string[];
   panelScale?: number;
+  panelCorner?: PanelCorner;
 }
 
 async function readSettings(): Promise<PanelSettings> {
@@ -291,6 +299,16 @@ function clampPosition(left: number, top: number): { left: number; top: number }
   return {
     left: Math.min(Math.max(MARGIN, left), maxLeft),
     top: Math.min(Math.max(MARGIN, top), maxTop),
+  };
+}
+
+/** 根据设置里选择的角落算出停靠坐标 */
+function positionForCorner(corner: PanelCorner): { left: number; top: number } {
+  const right = window.innerWidth - size - MARGIN;
+  const bottom = window.innerHeight - size - MARGIN;
+  return {
+    left: corner === 'top-left' || corner === 'bottom-left' ? MARGIN : right,
+    top: corner === 'top-left' || corner === 'top-right' ? MARGIN : bottom,
   };
 }
 
@@ -580,6 +598,7 @@ async function bootstrap(): Promise<void> {
   await applyLocale();
   scalePref = settings.panelScale ?? 100;
   applyScale(scalePref);
+  cornerPref = settings.panelCorner ?? 'bottom-right';
 
   const result = await request<PanelState>({ type: 'GET_PANEL_STATE' });
   if (!result.ok) return;
@@ -591,7 +610,7 @@ async function bootstrap(): Promise<void> {
   mount();
   if (!host) return;
 
-  position = clampPosition(window.innerWidth - size - MARGIN, window.innerHeight - size - MARGIN);
+  position = positionForCorner(cornerPref);
   try {
     const stored = (await chrome.storage.local.get(POS_KEY))[POS_KEY] as
       | { left?: number; top?: number }
@@ -627,6 +646,18 @@ chrome.runtime.onMessage.addListener((message: { type?: string } | undefined) =>
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
+
+  // 位置被重置（切换角落 / 恢复默认）时，已挂载的面板立即归位
+  if (changes[POS_KEY] && host) {
+    const stored = changes[POS_KEY].newValue as { left?: number; top?: number } | undefined;
+    if (typeof stored?.left === 'number' && typeof stored?.top === 'number') {
+      position = { left: stored.left, top: stored.top };
+    } else {
+      position = positionForCorner(cornerPref);
+    }
+    applyPosition();
+  }
+
   const next = changes[SETTINGS_KEY]?.newValue as PanelSettings | undefined;
   if (!next) return;
 
@@ -652,6 +683,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (next.panelScale !== undefined && next.panelScale !== scalePref) {
     destroy();
     void bootstrap();
+    return;
+  }
+  // 位置设置变化：无需重绘，直接停靠到新角落
+  if (next.panelCorner !== undefined && next.panelCorner !== cornerPref) {
+    cornerPref = next.panelCorner;
+    position = positionForCorner(cornerPref);
+    applyPosition();
   }
 });
 

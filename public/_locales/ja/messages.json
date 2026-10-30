@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Cookie Switcher",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "サイトごとの Cookie を ID として保存し、ワンクリックで切り替えます。",
+    "description": "Extension description"
+  }
+}

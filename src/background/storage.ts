@@ -88,6 +88,15 @@ export async function loadSettings(): Promise<Settings> {
     settings.panelScale = 100;
   }
   settings.panelScale = Math.min(150, Math.max(50, Math.round(settings.panelScale)));
+
+  // 悬浮窗角落只认四个合法值，其余（含旧版本缺失）回落到默认
+  const corners: Settings['panelCorner'][] = [
+    'top-left',
+    'top-right',
+    'bottom-left',
+    'bottom-right',
+  ];
+  if (!corners.includes(settings.panelCorner)) settings.panelCorner = 'bottom-right';
   return settings;
 }
 

@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Cookie Switcher",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Save per-site cookies as identities and switch between them with one click.",
+    "description": "Extension description"
+  }
+}

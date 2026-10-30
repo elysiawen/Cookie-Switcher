@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Cookie Switcher",
+    "description": "扩展名称"
+  },
+  "extDescription": {
+    "message": "把网站 Cookie（可选 localStorage）保存为身份，一键切换并刷新页面。",
+    "description": "扩展描述"
+  }
+}

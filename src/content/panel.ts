@@ -439,7 +439,12 @@ async function switchTo(profile: Profile): Promise<void> {
     return;
   }
 
-  setStatus(t('panel.switched', { name: result.data.profileName }));
+  const writeBack = result.data.writeBack;
+  setStatus(
+    writeBack
+      ? t('panel.writeBackDone', { name: writeBack.name })
+      : t('panel.switched', { name: result.data.profileName }),
+  );
   renderRows();
 }
 
@@ -544,7 +549,10 @@ function mount(): void {
           <button class="close" type="button">×</button>
         </div>
         <div class="list"></div>
-        <div class="foot"><span class="status"></span><button class="manage" type="button"></button></div>
+        <div class="foot">
+          <span class="status"></span>
+          <button class="manage" type="button"></button>
+        </div>
       </div>
     </div>`;
 

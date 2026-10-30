@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   detectBrowserLocale,
+  formatDateTime,
   formatTime,
   LOCALE_LABELS,
   SUPPORTED_LOCALES,
@@ -9,14 +10,18 @@ import {
 import { useI18n } from '@/shared/i18n/provider';
 import { Confirm } from '@/shared/Confirm';
 import { parseSiteRules } from '@/shared/access';
+import { reorderProfiles } from '@/shared/domain';
 import { LOCKED_ERROR, sendMessage } from '@/shared/messages';
 import {
   DEFAULT_SETTINGS,
+  MAX_HISTORY_LIMIT,
   type ExportBundle,
+  type HistorySnapshot,
   type LockState,
   type PanelCorner,
   type Profile,
   type QuickAccessScope,
+  type SaveResult,
   type Settings,
 } from '@/shared/types';
 
@@ -24,10 +29,25 @@ type Toast = { kind: 'ok' | 'err' | 'info'; text: string } | null;
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 
+/** 历史快照的来源 → 可翻译文案 */
+const HISTORY_REASON_KEY = {
+  writeBack: 'options.historyReasonWriteBack',
+  overwrite: 'options.historyReasonOverwrite',
+  restore: 'options.historyReasonRestore',
+} as const;
+
+interface ImportItem {
+  name: string;
+  site: string;
+  cookies: number;
+  hasStorage: boolean;
+}
+
 interface PendingImport {
   fileName: string;
-  payload: string;
-  count: number;
+  /** 文件里原始的 profile 数组，导入时按勾选结果筛选后重新序列化 */
+  raw: unknown[];
+  items: ImportItem[];
 }
 
 function Switch({
@@ -147,14 +167,30 @@ export default function App() {
   const [toast, setToast] = useState<Toast>(null);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [overwriteId, setOverwriteId] = useState<string | null>(null);
+  const [overwriteStorage, setOverwriteStorage] = useState(true);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearSite, setClearSite] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [importSelected, setImportSelected] = useState<boolean[]>([]);
   const [busy, setBusy] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [siteDraft, setSiteDraft] = useState('');
   const [scaleDraft, setScaleDraft] = useState(100);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistorySnapshot[]>([]);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const dragRef = useRef<{
+    id: string;
+    pointerId: number;
+    startY: number;
+    moved: boolean;
+    /** 拖动所在的分组表格，排序只在这个分组内进行 */
+    container: HTMLElement | null;
+  } | null>(null);
+  const dragOrderRef = useRef<string[]>([]);
   const scaleTimer = useRef<number | null>(null);
   const [tab, setTab] = useState<'profiles' | 'settings'>(
     () => (window.location.hash === '#profiles' ? 'profiles' : 'settings'),
@@ -237,6 +273,79 @@ export default function App() {
   );
 
   const deleteTarget = profiles.find((item) => item.id === confirmId) ?? null;
+  const overwriteTarget = profiles.find((item) => item.id === overwriteId) ?? null;
+  const historyTarget = profiles.find((item) => item.id === historyId) ?? null;
+  const importCount = importSelected.filter(Boolean).length;
+  const allImportSelected = importSelected.length > 0 && importCount === importSelected.length;
+
+  const toggleImportItem = (index: number) => {
+    setImportSelected((prev) => prev.map((value, i) => (i === index ? !value : value)));
+  };
+
+  const toggleImportAll = () => {
+    setImportSelected((prev) => prev.map(() => !allImportSelected));
+  };
+
+  /** 按住行首把手拖动，即可调整同一站点分组内身份的顺序 */
+  const gripHandlers = (profile: Profile) => ({
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragRef.current = {
+        id: profile.id,
+        pointerId: event.pointerId,
+        startY: event.clientY,
+        moved: false,
+        container: event.currentTarget.closest('.table'),
+      };
+    },
+    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => {
+      const drag = dragRef.current;
+      const container = drag?.container;
+      if (!drag || !container || event.pointerId !== drag.pointerId) return;
+      if (!drag.moved) {
+        if (Math.abs(event.clientY - drag.startY) < 3) return;
+        drag.moved = true;
+        setDragId(drag.id);
+      }
+      event.preventDefault();
+
+      const ids = [...container.querySelectorAll<HTMLElement>('.trow')]
+        .map((row) => row.dataset.id)
+        .filter((id): id is string => id !== undefined);
+      // 指针越过某行的中线，就把被拖动的行放到它前面
+      let beforeId: string | null = null;
+      for (const id of ids) {
+        if (id === drag.id) continue;
+        const row = container.querySelector<HTMLElement>(`.trow[data-id="${id}"]`);
+        if (!row) continue;
+        const rect = row.getBoundingClientRect();
+        if (event.clientY < rect.top + rect.height / 2) {
+          beforeId = id;
+          break;
+        }
+      }
+
+      const without = ids.filter((id) => id !== drag.id);
+      const at = beforeId ? without.indexOf(beforeId) : without.length;
+      const next = [...without];
+      next.splice(at < 0 ? without.length : at, 0, drag.id);
+      dragOrderRef.current = next;
+      setProfiles((prev) => reorderProfiles(prev, next));
+    },
+    onPointerUp: (event: ReactPointerEvent<HTMLElement>) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      dragRef.current = null;
+      setDragId(null);
+      const ids = dragOrderRef.current;
+      if (!drag.moved || !drag.container || ids.length < 2) return;
+      void sendMessage<{ order: string[] }>({ type: 'REORDER_PROFILES', ids }).then((result) => {
+        if (!result.ok) setToast({ kind: 'err', text: result.error });
+      });
+    },
+  });
 
   const handleRename = async () => {
     if (!editing) return;
@@ -284,6 +393,57 @@ export default function App() {
     await refresh();
   };
 
+  const handleOverwrite = async (id: string) => {
+    setOverwriteId(null);
+    const result = await sendMessage<SaveResult>({
+      type: 'OVERWRITE_PROFILE',
+      id,
+      includeStorage: overwriteStorage,
+    });
+    if (!result.ok) {
+      setToast({ kind: 'err', text: result.error });
+      return;
+    }
+    // Cookie 已覆盖；若 localStorage 未能刷新（如站点未打开），把原因如实告知
+    if (result.data.errors.length > 0) {
+      setToast({ kind: 'err', text: result.data.errors[0] });
+    } else {
+      setToast({ kind: 'ok', text: t('options.overwritten', { name: result.data.profile?.name ?? '' }) });
+    }
+    await refresh();
+  };
+
+  const openHistory = async (id: string) => {
+    setHistoryId(id);
+    setHistory([]);
+    const result = await sendMessage<HistorySnapshot[]>({ type: 'GET_PROFILE_HISTORY', id });
+    if (!result.ok) {
+      setToast({ kind: 'err', text: result.error });
+      return;
+    }
+    setHistory(result.data);
+  };
+
+  const handleRestore = async (id: string, snapshotId: string) => {
+    if (restoringId) return;
+    setRestoringId(snapshotId);
+    const result = await sendMessage<{ name: string }>({
+      type: 'RESTORE_HISTORY',
+      id,
+      snapshotId,
+    });
+    setRestoringId(null);
+    if (!result.ok) {
+      setToast({ kind: 'err', text: result.error });
+      return;
+    }
+    setToast({ kind: 'ok', text: t('options.historyRestored', { name: result.data.name }) });
+    await refresh();
+    // 还原本身也会留档，列表要重新取一次
+    const next = await sendMessage<HistorySnapshot[]>({ type: 'GET_PROFILE_HISTORY', id });
+    if (next.ok) setHistory(next.data);
+  };
+
   const handleExport = async () => {
     const result = await sendMessage<ExportBundle>({ type: 'EXPORT_DATA' });
     if (!result.ok) {
@@ -314,7 +474,18 @@ export default function App() {
       const parsed = JSON.parse(text) as { profiles?: unknown } | unknown[];
       const list = Array.isArray(parsed) ? parsed : parsed?.profiles;
       if (!Array.isArray(list)) throw new Error('missing');
-      setPendingImport({ fileName: file.name, payload: text, count: list.length });
+      const items = list.map((entry): ImportItem => {
+        const raw = (entry ?? {}) as Record<string, unknown>;
+        const site = typeof raw.site === 'string' ? raw.site : '';
+        return {
+          name: typeof raw.name === 'string' && raw.name ? raw.name : site,
+          site,
+          cookies: Array.isArray(raw.cookies) ? raw.cookies.length : 0,
+          hasStorage: raw.storage != null,
+        };
+      });
+      setPendingImport({ fileName: file.name, raw: list, items });
+      setImportSelected(list.map(() => true));
     } catch {
       setToast({ kind: 'err', text: t('options.importInvalid') });
     }
@@ -323,10 +494,12 @@ export default function App() {
 
   const runImport = async (mode: 'merge' | 'replace') => {
     if (!pendingImport || busy) return;
+    const selected = pendingImport.raw.filter((_, index) => importSelected[index]);
+    if (selected.length === 0) return;
     setBusy(true);
     const result = await sendMessage<{ imported: number; total: number }>({
       type: 'IMPORT_DATA',
-      payload: pendingImport.payload,
+      payload: JSON.stringify({ profiles: selected }),
       mode,
     });
     setBusy(false);
@@ -335,6 +508,7 @@ export default function App() {
       return;
     }
     setPendingImport(null);
+    setImportSelected([]);
     setToast({
       kind: 'ok',
       text: t('options.importDone', {
@@ -572,6 +746,7 @@ export default function App() {
               </div>
               <div className="table">
                 <div className="thead">
+                  <span />
                   <span>{t('options.colName')}</span>
                   <span>{t('options.colScope')}</span>
                   <span>{t('options.colCookie')}</span>
@@ -580,7 +755,25 @@ export default function App() {
                   <span />
                 </div>
                 {list.map((profile) => (
-                  <div className="trow" key={profile.id}>
+                  <div
+                    className={dragId === profile.id ? 'trow dragging' : 'trow'}
+                    key={profile.id}
+                    data-id={profile.id}
+                  >
+                    <span
+                      className="grip"
+                      title={t('options.dragHint')}
+                      {...gripHandlers(profile)}
+                    >
+                      <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
+                        <circle cx="9" cy="6" r="1.8" />
+                        <circle cx="15" cy="6" r="1.8" />
+                        <circle cx="9" cy="12" r="1.8" />
+                        <circle cx="15" cy="12" r="1.8" />
+                        <circle cx="9" cy="18" r="1.8" />
+                        <circle cx="15" cy="18" r="1.8" />
+                      </svg>
+                    </span>
                     <span className="cell name">
                       {editing?.id === profile.id ? (
                         <input
@@ -607,14 +800,16 @@ export default function App() {
                         </button>
                       )}
                     </span>
-                    <span className="cell">
+                    <span className="cell" data-label={t('options.colScope')}>
                       <span className="pill">
                         {profile.scope === 'exact'
                           ? t('options.scopeExact')
                           : t('options.scopeSubdomains')}
                       </span>
                     </span>
-                    <span className="cell mono">{profile.cookies.length}</span>
+                    <span className="cell mono" data-label={t('options.colCookie')}>
+                      {profile.cookies.length}
+                    </span>
                     <span className="cell">
                       {profile.storage ? (
                         <span className="pill accent">
@@ -624,8 +819,31 @@ export default function App() {
                         <span className="dim">—</span>
                       )}
                     </span>
-                    <span className="cell dim">{formatTime(profile.updatedAt, t)}</span>
+                    <span className="cell dim" data-label={t('options.colUpdated')}>
+                      {formatTime(profile.updatedAt, t)}
+                    </span>
                     <span className="cell actions">
+                      {profile.history && profile.history.length > 0 && (
+                        <button
+                          type="button"
+                          className="mini ghost"
+                          title={t('options.historyHint')}
+                          onClick={() => void openHistory(profile.id)}
+                        >
+                          {t('options.history')}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="mini ghost"
+                        title={t('options.overwriteHint')}
+                        onClick={() => {
+                          setOverwriteStorage(true);
+                          setOverwriteId(profile.id);
+                        }}
+                      >
+                        {t('options.overwrite')}
+                      </button>
                       <button
                         type="button"
                         className="mini ghost"
@@ -665,6 +883,46 @@ export default function App() {
             checked={settings.reloadAllSiteTabs}
             onChange={(next) => void updateSettings({ reloadAllSiteTabs: next })}
           />
+        </div>
+        <div className="setting">
+          <div>
+            <p className="setting-title">{t('options.writeBack')}</p>
+            <p className="setting-desc">{t('options.writeBackDesc')}</p>
+          </div>
+          <Switch
+            checked={settings.writeBackOnSwitch}
+            onChange={(next) => void updateSettings({ writeBackOnSwitch: next })}
+          />
+        </div>
+        <div className="setting">
+          <div>
+            <p className="setting-title">{t('options.historyEnabled')}</p>
+            <p className="setting-desc">{t('options.historyEnabledDesc')}</p>
+          </div>
+          <Switch
+            checked={settings.historyEnabled}
+            onChange={(next) => void updateSettings({ historyEnabled: next })}
+          />
+        </div>
+        <div className="setting">
+          <div>
+            <p className="setting-title">{t('options.historyLimit')}</p>
+            <p className="setting-desc">
+              {t('options.historyLimitDesc', { max: MAX_HISTORY_LIMIT })}
+            </p>
+          </div>
+          <select
+            className="select"
+            value={settings.historyLimit}
+            aria-label={t('options.historyLimit')}
+            onChange={(event) => void updateSettings({ historyLimit: Number(event.target.value) })}
+          >
+            {Array.from({ length: MAX_HISTORY_LIMIT }, (_, index) => index + 1).map((count) => (
+              <option key={count} value={count}>
+                {count}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 
@@ -910,13 +1168,43 @@ export default function App() {
       {pendingImport && (
         <div className="modal-mask" onClick={() => setPendingImport(null)}>
           <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <h3>{t('options.importTitle', { count: pendingImport.count })}</h3>
+            <h3>{t('options.importTitle', { count: importCount })}</h3>
             <p className="modal-desc">{pendingImport.fileName}</p>
+            {pendingImport.items.length > 0 && (
+              <>
+                <label className="check import-selectall">
+                  <input
+                    type="checkbox"
+                    checked={allImportSelected}
+                    onChange={toggleImportAll}
+                  />
+                  <span>{t('options.importSelectAll')}</span>
+                </label>
+                <ul className="import-list">
+                  {pendingImport.items.map((item, index) => (
+                    <li key={`${index}-${item.site}`}>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={!!importSelected[index]}
+                          onChange={() => toggleImportItem(index)}
+                        />
+                        <span>{item.name}</span>
+                      </label>
+                      <span className="import-meta">
+                        {item.site} · {t('options.importCookiesCount', { count: item.cookies })}
+                        {item.hasStorage ? ' · localStorage' : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             <div className="modal-actions">
               <button
                 type="button"
                 className="btn"
-                disabled={busy}
+                disabled={busy || importCount === 0}
                 onClick={() => void runImport('merge')}
               >
                 {t('options.importMerge')}
@@ -924,7 +1212,7 @@ export default function App() {
               <button
                 type="button"
                 className="btn primary"
-                disabled={busy}
+                disabled={busy || importCount === 0}
                 onClick={() => void runImport('replace')}
               >
                 {t('options.importReplace')}
@@ -961,6 +1249,79 @@ export default function App() {
           if (deleteTarget) void handleDelete(deleteTarget.id);
         }}
       />
+
+      <Confirm
+        open={overwriteTarget !== null}
+        title={t('confirm.overwriteTitle')}
+        desc={t('confirm.overwriteDesc', {
+          name: overwriteTarget?.name ?? '',
+          site: overwriteTarget?.site ?? '',
+        })}
+        confirmText={t('options.overwrite')}
+        onCancel={() => {
+          setOverwriteId(null);
+          setOverwriteStorage(true);
+        }}
+        onConfirm={() => {
+          if (overwriteTarget) void handleOverwrite(overwriteTarget.id);
+        }}
+      >
+        <label className="check confirm-check">
+          <input
+            type="checkbox"
+            checked={overwriteStorage}
+            onChange={(event) => setOverwriteStorage(event.target.checked)}
+          />
+          <span>
+            {t('options.overwriteStorage')}
+            <em>
+              {overwriteTarget?.storage
+                ? t('options.overwriteStorageNote', { origin: overwriteTarget.storage.origin })
+                : t('options.overwriteStorageHint')}
+            </em>
+          </span>
+        </label>
+      </Confirm>
+
+      {historyTarget && (
+        <div className="modal-mask" onClick={() => setHistoryId(null)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <h3>{t('options.historyTitle', { name: historyTarget.name })}</h3>
+            <p className="modal-desc">{t('options.historyDesc')}</p>
+            {history.length > 0 ? (
+              <ul className="history-list">
+                {history.map((item) => (
+                  <li key={item.id}>
+                    <div className="history-info">
+                      <span className="history-time">{formatDateTime(item.createdAt)}</span>
+                      <span className="history-meta">
+                        {formatTime(item.createdAt, t)} · {t(HISTORY_REASON_KEY[item.reason])} ·{' '}
+                        {t('options.historyCookies', { count: item.cookies.length })}
+                        {item.storage
+                          ? ` · LS ${Object.keys(item.storage.localStorage).length}`
+                          : ''}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="mini history-restore"
+                      disabled={restoringId !== null}
+                      onClick={() => void handleRestore(historyTarget.id, item.id)}
+                    >
+                      {t('options.historyRestore')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="history-empty">{t('options.historyEmpty')}</p>
+            )}
+            <button type="button" className="modal-cancel" onClick={() => setHistoryId(null)}>
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <Confirm
         open={confirmClear}

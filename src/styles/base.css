@@ -111,6 +111,38 @@ select {
   word-break: break-word;
 }
 
+/* 确认弹窗里的勾选项 */
+.confirm-check {
+  margin-bottom: 18px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.check input {
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.check em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.check.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .confirm-btns {
   display: flex;
   justify-content: flex-end;

@@ -30,6 +30,16 @@ export interface StorageSnapshot {
   localStorage: Record<string, string>;
 }
 
+/** 身份被回写或覆盖之前留下的一份旧状态，供用户在身份列表里还原 */
+export interface HistorySnapshot {
+  id: string;
+  createdAt: number;
+  /** 快照的产生来源：切换前的自动回写、手动覆盖、或还原前的兜底留档 */
+  reason: 'writeBack' | 'overwrite' | 'restore';
+  cookies: CookieRecord[];
+  storage?: StorageSnapshot;
+}
+
 export interface Profile {
   id: string;
   name: string;
@@ -38,9 +48,15 @@ export interface Profile {
   scope: Scope;
   cookies: CookieRecord[];
   storage?: StorageSnapshot;
+  /** 历史快照，最新的在最前面；仅在「保留历史快照」开启时产生 */
+  history?: HistorySnapshot[];
   createdAt: number;
   updatedAt: number;
 }
+
+/** 每个身份最多保留的历史快照数量上限 */
+export const MAX_HISTORY_LIMIT = 10;
+export const DEFAULT_HISTORY_LIMIT = 5;
 
 export interface LockState {
   /** 是否设置了启动密码 */
@@ -60,8 +76,14 @@ export type PanelCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-rig
 export interface Settings {
   /** 切换后自动刷新标签页 */
   reloadAfterSwitch: boolean;
-  /** 同时刷新该站点下其他标签页 */
+  /** 同时刷新该站点其他标签页 */
   reloadAllSiteTabs: boolean;
+  /** 切换前先把浏览器里当前生效身份的最新状态回写到它的快照（默认关闭） */
+  writeBackOnSwitch: boolean;
+  /** 回写或覆盖身份前，先把它的上一份状态留成历史快照（默认关闭） */
+  historyEnabled: boolean;
+  /** 每个身份最多保留多少份历史快照，上限 MAX_HISTORY_LIMIT */
+  historyLimit: number;
   /** 是否加密存储 Profile（默认开启） */
   encryptStorage: boolean;
   /** 界面语言偏好 */
@@ -83,6 +105,9 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   reloadAfterSwitch: true,
   reloadAllSiteTabs: false,
+  writeBackOnSwitch: false,
+  historyEnabled: false,
+  historyLimit: DEFAULT_HISTORY_LIMIT,
   encryptStorage: true,
   locale: 'auto',
   contextMenuEnabled: false,
@@ -122,6 +147,13 @@ export interface PanelState {
   profiles: Profile[];
 }
 
+/** 切换前发生过回写时返回，供界面提示回写了哪个身份 */
+export interface WriteBackInfo {
+  /** 被回写的身份 id */
+  id: string;
+  name: string;
+}
+
 export interface SwitchResult {
   ok: boolean;
   profileName: string;
@@ -134,6 +166,8 @@ export interface SwitchResult {
   /** 非致命但需要提醒用户的情况 */
   warnings: string[];
   errors: string[];
+  /** 本次切换前回写了哪个身份；没有回写则为 undefined */
+  writeBack?: WriteBackInfo;
 }
 
 /** 清除当前站点 cookie（相当于在当前网页登出，已保存的身份不受影响） */

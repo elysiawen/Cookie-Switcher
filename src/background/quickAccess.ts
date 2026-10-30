@@ -72,9 +72,8 @@ async function currentHostname(): Promise<string | null> {
 }
 
 function matchProfiles(profiles: Profile[], hostname: string): Profile[] {
-  return profiles
-    .filter((profile) => profileCoversHostname(profile, hostname))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  // 保持存储顺序，与悬浮窗 / 弹窗里的排列一致
+  return profiles.filter((profile) => profileCoversHostname(profile, hostname));
 }
 
 /** 按设置与当前页面重建菜单；关闭设置或站点被排除时只有「移除」这一步 */

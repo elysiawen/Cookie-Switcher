@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { formatTime } from '@/shared/i18n';
 import { useI18n } from '@/shared/i18n/provider';
 import { Confirm } from '@/shared/Confirm';
@@ -13,7 +20,10 @@ import type {
   SwitchResult,
 } from '@/shared/types';
 
-type Toast = { kind: 'ok' | 'err' | 'warn'; text: string } | null;
+type Toast = {
+  kind: 'ok' | 'err' | 'warn';
+  text: string;
+} | null;
 
 function hueOf(text: string): number {
   let hash = 0;
@@ -39,15 +49,48 @@ interface RowProps {
   profile: Profile;
   busy: boolean;
   disabled: boolean;
+  dragging: boolean;
   onSwitch: () => void;
+  onAskOverwrite: () => void;
   onAskDelete: () => void;
+  onGripDown: (event: ReactPointerEvent<HTMLElement>) => void;
+  onGripMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onGripUp: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
-function ProfileRow({ profile, busy, disabled, onSwitch, onAskDelete }: RowProps) {
+function ProfileRow({
+  profile,
+  busy,
+  disabled,
+  dragging,
+  onSwitch,
+  onAskOverwrite,
+  onAskDelete,
+  onGripDown,
+  onGripMove,
+  onGripUp,
+}: RowProps) {
   const { t } = useI18n();
 
   return (
-    <li className="row">
+    <li className={dragging ? 'row dragging' : 'row'} data-id={profile.id}>
+      <span
+        className="row-grip"
+        title={t('popup.dragHint')}
+        onPointerDown={onGripDown}
+        onPointerMove={onGripMove}
+        onPointerUp={onGripUp}
+        onPointerCancel={onGripUp}
+      >
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
+          <circle cx="9" cy="6" r="1.8" />
+          <circle cx="15" cy="6" r="1.8" />
+          <circle cx="9" cy="12" r="1.8" />
+          <circle cx="15" cy="12" r="1.8" />
+          <circle cx="9" cy="18" r="1.8" />
+          <circle cx="15" cy="18" r="1.8" />
+        </svg>
+      </span>
       <button type="button" className="row-main" onClick={onSwitch} disabled={disabled || busy}>
         <Avatar name={profile.name} />
         <span className="row-text">
@@ -63,6 +106,28 @@ function ProfileRow({ profile, busy, disabled, onSwitch, onAskDelete }: RowProps
           </span>
         </span>
         {busy && <span className="spinner" />}
+      </button>
+      <button
+        type="button"
+        className="row-overwrite"
+        title={t('options.overwriteHint')}
+        onClick={onAskOverwrite}
+        disabled={disabled || busy}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="15"
+          height="15"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M20 11a8 8 0 1 0-2.35 5.65" />
+          <path d="M20 5.5V11h-5.5" />
+        </svg>
       </button>
       <button type="button" className="row-del" title={t('common.delete')} onClick={onAskDelete}>
         <svg
@@ -175,6 +240,8 @@ export default function App() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [overwriteId, setOverwriteId] = useState<string | null>(null);
+  const [overwriteStorage, setOverwriteStorage] = useState(true);
   const [toast, setToast] = useState<Toast>(null);
   const [saveOpen, setSaveOpen] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
@@ -183,6 +250,14 @@ export default function App() {
   const [name, setName] = useState('');
   const [scope, setScope] = useState<Scope>('subdomains');
   const [includeStorage, setIncludeStorage] = useState(false);
+  /** 列表当前的展示顺序（身份 id），拖动时即时更新，松手后落盘 */
+  const [order, setOrder] = useState<string[]>([]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const orderRef = useRef<string[]>([]);
+  const dragRef = useRef<{ id: string; pointerId: number; startY: number; moved: boolean } | null>(
+    null,
+  );
 
   const refreshLock = useCallback(async () => {
     const result = await sendMessage<LockState>({ type: 'GET_LOCK_STATE' });
@@ -222,10 +297,87 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  // 后台返回的顺序即最终顺序，数据变化（切换 / 新增 / 删除）后同步一次
+  useEffect(() => {
+    const ids = state?.profiles.map((item) => item.id) ?? [];
+    orderRef.current = ids;
+    setOrder(ids);
+  }, [state]);
+
   const context = state?.context;
   const profiles = state?.profiles ?? [];
   const canOperate = Boolean(context?.injectable);
   const deleteTarget = profiles.find((item) => item.id === confirmId) ?? null;
+  const overwriteTarget = profiles.find((item) => item.id === overwriteId) ?? null;
+
+  const ordered = useMemo(() => {
+    const map = new Map(profiles.map((item) => [item.id, item]));
+    const list = order
+      .map((id) => map.get(id))
+      .filter((item): item is Profile => item !== undefined);
+    // order 可能还没跟上最新数据，补上遗漏的身份
+    if (list.length < profiles.length) {
+      const seen = new Set(list.map((item) => item.id));
+      for (const item of profiles) if (!seen.has(item.id)) list.push(item);
+    }
+    return list;
+  }, [profiles, order]);
+
+  /** 松手后把当前展示顺序落盘；后台只调整这组身份的相对顺序 */
+  const commitOrder = async () => {
+    const ids = orderRef.current;
+    if (ids.length < 2) return;
+    const result = await sendMessage<{ order: string[] }>({ type: 'REORDER_PROFILES', ids });
+    if (!result.ok) setToast({ kind: 'err', text: result.error });
+  };
+
+  const gripHandlers = (id: string) => ({
+    onGripDown: (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragRef.current = { id, pointerId: event.pointerId, startY: event.clientY, moved: false };
+    },
+    onGripMove: (event: ReactPointerEvent<HTMLElement>) => {
+      const drag = dragRef.current;
+      const list = listRef.current;
+      if (!drag || !list || event.pointerId !== drag.pointerId) return;
+      if (!drag.moved) {
+        if (Math.abs(event.clientY - drag.startY) < 3) return;
+        drag.moved = true;
+        setDragId(drag.id);
+      }
+      event.preventDefault();
+
+      // 指针越过某行的中线，就把被拖动的行插到它前面
+      let beforeId: string | null = null;
+      for (const row of [...list.querySelectorAll<HTMLElement>('li.row')]) {
+        const rowId = row.dataset.id;
+        if (!rowId || rowId === drag.id) continue;
+        const rect = row.getBoundingClientRect();
+        if (event.clientY < rect.top + rect.height / 2) {
+          beforeId = rowId;
+          break;
+        }
+      }
+
+      const without = orderRef.current.filter((item) => item !== drag.id);
+      const at = beforeId ? without.indexOf(beforeId) : without.length;
+      const next = [...without];
+      next.splice(at < 0 ? without.length : at, 0, drag.id);
+      if (next.every((item, index) => item === orderRef.current[index])) return;
+      orderRef.current = next;
+      setOrder(next);
+    },
+    onGripUp: (event: ReactPointerEvent<HTMLElement>) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      dragRef.current = null;
+      setDragId(null);
+      if (!drag.moved) return;
+      void commitOrder();
+    },
+  });
 
   const openSave = () => {
     setName(t('popup.defaultName', { n: profiles.length + 1 }));
@@ -280,6 +432,8 @@ export default function App() {
     if (data.skippedExpired) detail.push(t('popup.skippedExpired', { count: data.skippedExpired }));
     if (data.storageWritten) detail.push(t('popup.lsSynced'));
     if (data.storageNote) detail.push(data.storageNote);
+    const writeBack = data.writeBack;
+    if (writeBack) detail.push(t('popup.writeBackDone', { name: writeBack.name }));
     const trouble = data.errors[0] ?? data.warnings[0];
     setToast({
       kind: trouble ? 'warn' : 'ok',
@@ -300,6 +454,31 @@ export default function App() {
       return;
     }
     setToast({ kind: 'ok', text: t('popup.deleted') });
+    await refresh();
+  };
+
+  const handleOverwrite = async (id: string) => {
+    setOverwriteId(null);
+    setBusyId(id);
+    const result = await sendMessage<SaveResult>({
+      type: 'OVERWRITE_PROFILE',
+      id,
+      includeStorage: overwriteStorage,
+    });
+    setBusyId(null);
+    if (!result.ok) {
+      setToast({ kind: 'err', text: result.error });
+      return;
+    }
+    // Cookie 已覆盖；localStorage 未刷新时按警告提示
+    if (result.data.errors.length > 0) {
+      setToast({ kind: 'warn', text: result.data.errors[0] });
+    } else {
+      setToast({
+        kind: 'ok',
+        text: t('popup.overwritten', { name: result.data.profile?.name ?? '' }),
+      });
+    }
     await refresh();
   };
 
@@ -460,15 +639,18 @@ export default function App() {
                 <p className="empty-desc">{t('popup.emptyDesc')}</p>
               </div>
             ) : (
-              <ul className="list">
-                {profiles.map((profile) => (
+              <ul className="list" ref={listRef}>
+                {ordered.map((profile) => (
                   <ProfileRow
                     key={profile.id}
                     profile={profile}
                     busy={busyId === profile.id}
                     disabled={!canOperate}
+                    dragging={dragId === profile.id}
                     onSwitch={() => void handleSwitch(profile)}
+                    onAskOverwrite={() => setOverwriteId(profile.id)}
                     onAskDelete={() => setConfirmId(profile.id)}
+                    {...gripHandlers(profile.id)}
                   />
                 ))}
               </ul>
@@ -488,6 +670,39 @@ export default function App() {
           {t('popup.manageAll')}
         </button>
       </footer>
+
+      <Confirm
+        open={overwriteTarget !== null}
+        title={t('confirm.overwriteTitle')}
+        desc={t('confirm.overwriteDesc', {
+          name: overwriteTarget?.name ?? '',
+          site: overwriteTarget?.site ?? '',
+        })}
+        confirmText={t('options.overwrite')}
+        onCancel={() => {
+          setOverwriteId(null);
+          setOverwriteStorage(true);
+        }}
+        onConfirm={() => {
+          if (overwriteTarget) void handleOverwrite(overwriteTarget.id);
+        }}
+      >
+        <label className="check confirm-check">
+          <input
+            type="checkbox"
+            checked={overwriteStorage}
+            onChange={(event) => setOverwriteStorage(event.target.checked)}
+          />
+          <span>
+            {t('options.overwriteStorage')}
+            <em>
+              {t('options.overwriteStorageNote', {
+                origin: overwriteTarget?.storage?.origin ?? context?.origin ?? '-',
+              })}
+            </em>
+          </span>
+        </label>
+      </Confirm>
 
       <Confirm
         open={deleteTarget !== null}
@@ -590,7 +805,11 @@ export default function App() {
         </div>
       </Confirm>
 
-      {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
+      {toast && (
+        <div className={`toast ${toast.kind}`}>
+          <span className="toast-text">{toast.text}</span>
+        </div>
+      )}
     </div>
   );
 }

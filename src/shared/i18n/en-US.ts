@@ -11,6 +11,9 @@ export const enUS: Record<MessageKey, string> = {
   'confirm.deleteTitle': 'Delete profile',
   'confirm.deleteDesc':
     'The cookie snapshot of "{name}" will be deleted from this device. This cannot be undone.',
+  'confirm.overwriteTitle': 'Overwrite identity',
+  'confirm.overwriteDesc':
+    'The saved snapshot of "{name}" will be replaced with the cookies currently in the browser for {site}. This cannot be undone.',
   'confirm.clearSiteTitle': 'Clear site cookies',
   'confirm.clearSiteDesc':
     'All cookies of {site} will be removed, which signs you out of this site. Saved identities are not affected.',
@@ -29,6 +32,7 @@ export const enUS: Record<MessageKey, string> = {
   'popup.emptyTitle': 'No identity for this site yet',
   'popup.emptyDesc': 'Save the current login state and switch back to it anytime.',
   'popup.rowMeta': '{count} cookies · {time}',
+  'popup.dragHint': 'Drag the handle to reorder',
   'popup.nameLabel': 'Name',
   'popup.namePlaceholder': 'e.g. Work account',
   'popup.scopeLabel': 'Cookie scope',
@@ -56,10 +60,12 @@ export const enUS: Record<MessageKey, string> = {
   'popup.lsSynced': 'localStorage synced',
   'popup.failedCount': '{count} failed: {error}',
   'popup.deleted': 'Profile deleted',
+  'popup.overwritten': 'Overwrote {name} with the current cookies',
   'popup.clearSite': 'Clear cookies for this site',
   'popup.clearSiteDone': 'Cleared {count} cookies',
   'popup.clearSiteStorage': 'Also clear localStorage',
   'popup.clearSiteStorageDone': 'localStorage cleared ({count})',
+  'popup.writeBackDone': 'Saved the current state back to {name}',
 
   'menu.root': 'Switch cookie',
   'menu.empty': 'No saved identity for this site yet',
@@ -83,6 +89,7 @@ export const enUS: Record<MessageKey, string> = {
   'panel.switched': 'Switched to "{name}"',
   'panel.failed': 'Switch failed: {error}',
   'panel.close': 'Collapse',
+  'panel.writeBackDone': 'Saved the current state back to {name}',
 
   'lock.locked': 'Locked',
   'lock.desc': 'Enter your startup password to view identities stored on this device',
@@ -111,6 +118,7 @@ export const enUS: Record<MessageKey, string> = {
   'options.noMatchTitle': 'No matches',
   'options.noMatchDesc': 'Try a different keyword.',
   'options.colName': 'Name',
+  'options.dragHint': 'Drag the handle to reorder within this group',
   'options.colScope': 'Scope',
   'options.colCookie': 'Cookie',
   'options.colStorage': 'Storage',
@@ -118,8 +126,28 @@ export const enUS: Record<MessageKey, string> = {
   'options.scopeExact': 'Exact',
   'options.scopeSubdomains': 'Subdomains',
   'options.renameHint': 'Click to rename',
+  'options.overwrite': 'Overwrite',
+  'options.overwriteHint': 'Replace this identity with the cookies currently in the browser',
+  'options.overwriteStorage': 'Also overwrite the localStorage snapshot',
+  'options.overwriteStorageNote': 'Reads the current value of {origin}',
+  'options.overwriteStorageHint':
+    'Needs an open tab of this site; its current localStorage will be read',
+  'options.history': 'History',
+  'options.historyHint': 'View the history snapshots of this identity',
+  'options.historyTitle': 'History of "{name}"',
+  'options.historyDesc':
+    'Restoring turns the identity back into the selected snapshot; the current state is archived as a new snapshot first.',
+  'options.historyEmpty':
+    'No history yet. Turn on "Keep history snapshots" and write-backs or overwrites are archived automatically.',
+  'options.historyReasonWriteBack': 'Write-back',
+  'options.historyReasonOverwrite': 'Overwrite',
+  'options.historyReasonRestore': 'Before restore',
+  'options.historyCookies': '{count} cookies',
+  'options.historyRestore': 'Restore',
+  'options.historyRestored': 'Restored {name}',
   'options.deleted': 'Deleted',
   'options.renamed': 'Renamed',
+  'options.overwritten': 'Overwrote {name}',
   'options.exported': 'Exported {count} identities',
   'options.importInvalid': 'This file is not a valid export from this extension',
   'options.importDone': 'Imported {imported} identities, {total} in total',
@@ -163,6 +191,14 @@ export const enUS: Record<MessageKey, string> = {
   'options.reloadAfterSwitchDesc': 'Without a reload the old login state stays alive in memory.',
   'options.reloadAllTabs': 'Also reload other tabs of this site',
   'options.reloadAllTabsDesc': 'Matches tabs sharing the same site.',
+  'options.writeBack': 'Write back before switching',
+  'options.writeBackDesc':
+    'Before switching, the latest cookies and localStorage of the current identity are saved back into its snapshot, so changes the site made are not lost. If you signed out on the site before switching, the signed-out state is written back — turn on "Keep history" to restore it later from the identity list.',
+  'options.historyEnabled': 'Keep history snapshots',
+  'options.historyEnabledDesc':
+    'Before an automatic write-back or a manual overwrite, the previous state of the identity is archived so you can review and restore it from the identity list.',
+  'options.historyLimit': 'Snapshots per identity',
+  'options.historyLimitDesc': 'Keeps up to {max}, discarding the oldest one beyond that.',
   'options.language': 'Language',
   'options.languageDesc': 'Follows your browser by default; a manual choice is remembered.',
   'options.languageAuto': 'Follow browser ({locale})',
@@ -205,6 +241,8 @@ export const enUS: Record<MessageKey, string> = {
     'The context menu entry and floating panel are off by default and can be enabled under "Quick access". With the scope set to "All", they only appear on sites that already have an identity; whitelist and blacklist match by domain and include subdomains.',
   'options.version': 'Version {version}',
   'options.importTitle': 'Import {count} identities',
+  'options.importSelectAll': 'Select all',
+  'options.importCookiesCount': '{count} cookies',
   'options.importMerge': 'Merge (keep existing)',
   'options.importReplace': 'Replace all',
   'options.clearTitle': 'Clear all identities?',
@@ -220,6 +258,8 @@ export const enUS: Record<MessageKey, string> = {
     'The snapshot was taken on {origin} but this page is {current}, so it was skipped',
   'warn.parentCookies':
     '{count} cookies under parent domain {parent} were not switched, the session may still rely on them',
+  'warn.overwriteNoTab':
+    'No open tab for this site, so localStorage was not refreshed (cookies were updated)',
 
   'err.notWebPageSave': 'This tab is not an http/https page, cookies cannot be read',
   'err.notWebPageSwitch': 'This tab is not an http/https page, cannot switch',
@@ -241,4 +281,5 @@ export const enUS: Record<MessageKey, string> = {
   'err.keyStoreUnavailable': 'Cannot open the local key store',
   'err.passwordTooShort': 'Password must be at least {count} characters',
   'err.currentPasswordRequired': 'Enter your current password first',
+  'err.snapshotMissing': 'That history snapshot no longer exists',
 };

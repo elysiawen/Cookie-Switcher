@@ -1,4 +1,4 @@
-import type { CookieRecord, Scope } from './types';
+import { MAX_HISTORY_LIMIT, type CookieRecord, type HistorySnapshot, type Profile, type Scope } from './types';
 
 /** 常见的二级公共后缀，用于把 www.a.co.uk 归并到 a.co.uk */
 const SECOND_LEVEL = new Set([
@@ -81,6 +81,38 @@ export function originFromUrl(url: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** 新快照插到最前面，并按上限裁剪掉最旧的几份 */
+export function appendHistory(
+  history: HistorySnapshot[] | undefined,
+  snapshot: HistorySnapshot,
+  limit: number,
+): HistorySnapshot[] {
+  const max = Math.min(MAX_HISTORY_LIMIT, Math.max(1, Math.round(limit)));
+  return [snapshot, ...(history ?? [])].slice(0, max);
+}
+
+/**
+ * 按给定顺序调整一组身份的位置：它们原先占用的槽位不变，其余身份原位不动。
+ * 因此在一处拖动排序（弹窗、设置页的某个站点分组）不会打乱其他身份的排列。
+ */
+export function reorderProfiles(list: Profile[], ids: string[]): Profile[] {
+  const byId = new Map(list.map((item) => [item.id, item]));
+  const queue = [...new Set(ids)]
+    .map((id) => byId.get(id))
+    .filter((item): item is Profile => item !== undefined);
+  if (queue.length < 2) return list;
+
+  const moving = new Set(queue.map((item) => item.id));
+  const rest = list.filter((item) => !moving.has(item.id));
+  const next: Profile[] = [];
+  let moved = 0;
+  let kept = 0;
+  for (const item of list) {
+    next.push(moving.has(item.id) ? queue[moved++] : rest[kept++]);
+  }
+  return next;
 }
 
 

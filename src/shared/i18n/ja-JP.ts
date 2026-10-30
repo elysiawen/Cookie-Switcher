@@ -11,6 +11,9 @@ export const jaJP: Record<MessageKey, string> = {
   'confirm.deleteTitle': '削除の確認',
   'confirm.deleteDesc':
     '「{name}」の Cookie スナップショットをこの端末から削除します。この操作は元に戻せません。',
+  'confirm.overwriteTitle': '上書きの確認',
+  'confirm.overwriteDesc':
+    '「{name}」の保存済みスナップショットを、現在ブラウザにある {site} の Cookie で上書きします。この操作は元に戻せません。',
   'confirm.clearSiteTitle': 'Cookie の消去確認',
   'confirm.clearSiteDesc':
     '{site} のすべての Cookie を消去します。現在のページでログアウトするのと同じです。保存済みの ID には影響しません。',
@@ -30,6 +33,7 @@ export const jaJP: Record<MessageKey, string> = {
   'popup.emptyTitle': 'このサイトの ID はまだありません',
   'popup.emptyDesc': '現在のログイン状態を保存すれば、いつでもワンクリックで戻せます。',
   'popup.rowMeta': '{count} cookies · {time}',
+  'popup.dragHint': '左のハンドルをドラッグで並べ替え',
   'popup.nameLabel': '名前',
   'popup.namePlaceholder': '例：仕事用',
   'popup.scopeLabel': 'Cookie の範囲',
@@ -56,10 +60,12 @@ export const jaJP: Record<MessageKey, string> = {
   'popup.lsSynced': 'localStorage を同期しました',
   'popup.failedCount': '{count} 件失敗：{error}',
   'popup.deleted': 'Profile を削除しました',
+  'popup.overwritten': '「{name}」を現在の Cookie で上書きしました',
   'popup.clearSite': 'このサイトの Cookie を消去',
   'popup.clearSiteDone': '{count} 個の Cookie を消去しました',
   'popup.clearSiteStorage': 'localStorage も削除する',
   'popup.clearSiteStorageDone': 'localStorage を {count} 件削除しました',
+  'popup.writeBackDone': '現在の状態を「{name}」に書き戻しました',
 
   'menu.root': 'Cookieを切替',
   'menu.empty': 'このサイトには保存済みの ID がありません',
@@ -82,6 +88,7 @@ export const jaJP: Record<MessageKey, string> = {
   'panel.switched': '「{name}」に切り替えました',
   'panel.failed': '切り替えに失敗しました：{error}',
   'panel.close': '閉じる',
+  'panel.writeBackDone': '現在の状態を「{name}」に書き戻しました',
 
   'lock.locked': 'ロック中',
   'lock.desc': 'スタートアップパスワードを入力して、この端末に保存された ID を表示します',
@@ -111,6 +118,7 @@ export const jaJP: Record<MessageKey, string> = {
   'options.noMatchTitle': '一致する結果がありません',
   'options.noMatchDesc': '別のキーワードで試してください。',
   'options.colName': '名前',
+  'options.dragHint': '左のハンドルをドラッグでグループ内を並べ替え',
   'options.colScope': '範囲',
   'options.colCookie': 'Cookie',
   'options.colStorage': '保存先',
@@ -118,8 +126,28 @@ export const jaJP: Record<MessageKey, string> = {
   'options.scopeExact': 'このドメインのみ',
   'options.scopeSubdomains': 'サブドメインを含む',
   'options.renameHint': 'クリックして名前を変更',
+  'options.overwrite': '上書き',
+  'options.overwriteHint': '現在のブラウザの Cookie でこの ID を上書きします',
+  'options.overwriteStorage': 'localStorage スナップショットも上書きする',
+  'options.overwriteStorageNote': '{origin} の現在の値を読み取ります',
+  'options.overwriteStorageHint':
+    'このサイトを開いているタブが必要です。その現在の localStorage を読み取ります',
+  'options.history': '履歴',
+  'options.historyHint': 'この ID の履歴スナップショットを表示',
+  'options.historyTitle': '「{name}」の履歴',
+  'options.historyDesc':
+    '復元すると、選択したスナップショットの状態に ID を戻します。復元前に現在の状態を新しいスナップショットとして保存します。',
+  'options.historyEmpty':
+    '履歴はまだありません。「履歴スナップショットを保持」を有効にすると、書き戻しや上書きが自動で保存されます。',
+  'options.historyReasonWriteBack': '書き戻し',
+  'options.historyReasonOverwrite': '手動上書き',
+  'options.historyReasonRestore': '復元前',
+  'options.historyCookies': '{count} 件の Cookie',
+  'options.historyRestore': '復元',
+  'options.historyRestored': '「{name}」を復元しました',
   'options.deleted': '削除しました',
   'options.renamed': '名前を変更しました',
+  'options.overwritten': '「{name}」を上書きしました',
   'options.exported': '{count} 個の ID をエクスポートしました',
   'options.importInvalid': 'このファイルは本拡張機能がエクスポートした JSON 形式ではありません',
   'options.importDone': '{imported} 個の ID をインポートしました。現在 {total} 個です',
@@ -164,6 +192,14 @@ export const jaJP: Record<MessageKey, string> = {
     '更新しないと、ページのメモリ内にある古いログイン状態が有効なままになります。',
   'options.reloadAllTabs': '同じサイトの他のタブも更新',
   'options.reloadAllTabsDesc': '同じブラウザウィンドウ内の同一メインドメインのタブのみを対象にします。',
+  'options.writeBack': '切り替え前に現在の ID を書き戻す',
+  'options.writeBackDesc':
+    '切り替える前に、ブラウザにある現在の ID の最新の Cookie と localStorage をスナップショットに書き戻し、サイトでの変更が失われないようにします。サイトでログアウトした後に切り替えると、ログアウト状態が書き戻されます。「履歴スナップショットを保持」を有効にすると、ID 一覧から復元できます。',
+  'options.historyEnabled': '履歴スナップショットを保持',
+  'options.historyEnabledDesc':
+    '自動書き戻しや手動上書きの前に、その ID の直前の状態を保存します。あとから ID 一覧で確認・復元できます。',
+  'options.historyLimit': 'ID ごとの保持数',
+  'options.historyLimitDesc': '最大 {max} 件まで保持し、それを超えると最も古いものから破棄します。',
   'options.language': '言語',
   'options.languageDesc': '既定ではブラウザの言語に従います。手動で選択すると記憶されます。',
   'options.languageAuto': 'ブラウザに従う（{locale}）',
@@ -207,7 +243,9 @@ export const jaJP: Record<MessageKey, string> = {
   'options.note5':
     '右クリックメニューとフローティングパネルは既定でオフで、「クイックアクセス」で有効にできます。範囲が「すべて」の場合は保存済み ID があるサイトにのみ表示され、ホワイトリスト / ブラックリストはドメインで照合しサブドメインを自動的に含みます。',
   'options.version': 'バージョン {version}',
-  'options.importTitle': '{count} 個の ID をインポート',
+  'options.importTitle': '{count} 件の ID をインポート',
+  'options.importSelectAll': 'すべて選択',
+  'options.importCookiesCount': '{count} 件の Cookie',
   'options.importMerge': 'マージ（既存を保持）',
   'options.importReplace': 'すべて上書き',
   'options.clearTitle': 'すべての ID を消去しますか？',
@@ -223,6 +261,8 @@ export const jaJP: Record<MessageKey, string> = {
     'スナップショットの localStorage は {origin} のもので、現在のページは {current} のためスキップしました',
   'warn.parentCookies':
     '上位ドメイン {parent} に {count} 件の Cookie が未切り替えです。ログイン状態がそちらから来ている可能性があります',
+  'warn.overwriteNoTab':
+    'このサイトを開いているタブがないため、localStorage は更新されませんでした（Cookie は更新済み）',
 
   'err.notWebPageSave': '現在のタブは Web ページ（http/https）ではないため、Cookie を読み取れません',
   'err.notWebPageSwitch': '現在のタブは Web ページ（http/https）ではないため、切り替えできません',
@@ -244,4 +284,5 @@ export const jaJP: Record<MessageKey, string> = {
   'err.keyStoreUnavailable': 'ローカルキーストアを開けません',
   'err.passwordTooShort': 'スタートアップパスワードは {count} 文字以上です',
   'err.currentPasswordRequired': '先に現在のパスワードを入力してください',
+  'err.snapshotMissing': 'その履歴スナップショットは存在しません',
 };

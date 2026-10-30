@@ -1,6 +1,7 @@
 import type {
   ClearSiteResult,
   ExportBundle,
+  HistorySnapshot,
   LockState,
   PanelState,
   PopupState,
@@ -16,10 +17,14 @@ export type Request =
   | { type: 'GET_PANEL_STATE' }
   | { type: 'OPEN_OPTIONS' }
   | { type: 'SAVE_PROFILE'; name: string; scope: Scope; includeStorage: boolean }
+  | { type: 'OVERWRITE_PROFILE'; id: string; includeStorage: boolean }
   | { type: 'SWITCH_PROFILE'; id: string }
+  | { type: 'GET_PROFILE_HISTORY'; id: string }
+  | { type: 'RESTORE_HISTORY'; id: string; snapshotId: string }
   | { type: 'DELETE_PROFILE'; id: string }
   | { type: 'DELETE_PROFILES'; ids: string[] }
   | { type: 'RENAME_PROFILE'; id: string; name: string }
+  | { type: 'REORDER_PROFILES'; ids: string[] }
   | { type: 'GET_ALL_PROFILES' }
   | { type: 'EXPORT_DATA' }
   | { type: 'IMPORT_DATA'; payload: string; mode: 'merge' | 'replace' }
@@ -53,10 +58,14 @@ export type ResponseMap = {
   GET_PANEL_STATE: PanelState;
   OPEN_OPTIONS: { opened: true };
   SAVE_PROFILE: SaveResult;
+  OVERWRITE_PROFILE: SaveResult;
   SWITCH_PROFILE: SwitchResult;
+  GET_PROFILE_HISTORY: HistorySnapshot[];
+  RESTORE_HISTORY: { name: string };
   DELETE_PROFILE: { id: string };
   DELETE_PROFILES: { deleted: number };
   RENAME_PROFILE: Profile;
+  REORDER_PROFILES: { order: string[] };
   GET_ALL_PROFILES: Profile[];
   EXPORT_DATA: ExportBundle;
   IMPORT_DATA: { imported: number; total: number };

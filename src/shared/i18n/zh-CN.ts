@@ -12,6 +12,9 @@ export const zhCN = {
 
   'confirm.deleteTitle': '确认删除',
   'confirm.deleteDesc': '「{name}」的 Cookie 快照会从本机删除，此操作不可撤销。',
+  'confirm.overwriteTitle': '确认覆盖',
+  'confirm.overwriteDesc':
+    '将用浏览器当前对 {site} 的 Cookie 覆盖「{name}」已保存的快照。此操作不可撤销。',
   'confirm.clearSiteTitle': '确认清除 Cookie',
   'confirm.clearSiteDesc':
     '将清除 {site} 下的全部 Cookie，相当于在当前网页登出；已保存的身份不受影响。',
@@ -30,6 +33,7 @@ export const zhCN = {
   'popup.emptyTitle': '还没有这个站点的身份',
   'popup.emptyDesc': '保存当前登录状态后，就能随时一键切回来。',
   'popup.rowMeta': '{count} cookies · {time}',
+  'popup.dragHint': '拖动左侧图标可调整顺序',
   'popup.nameLabel': '名称',
   'popup.namePlaceholder': '例如：工作号',
   'popup.scopeLabel': 'Cookie 范围',
@@ -56,10 +60,12 @@ export const zhCN = {
   'popup.lsSynced': 'localStorage 已同步',
   'popup.failedCount': '{count} 项失败：{error}',
   'popup.deleted': 'Profile 已删除',
+  'popup.overwritten': '已用当前 Cookie 覆盖「{name}」',
   'popup.clearSite': '清除本站 Cookie',
   'popup.clearSiteDone': '已清除 {count} 个 cookie',
   'popup.clearSiteStorage': '同时清理 localStorage',
   'popup.clearSiteStorageDone': 'localStorage 清理 {count} 项',
+  'popup.writeBackDone': '已把当前状态回写到「{name}」',
 
   'menu.root': '切换Cookie',
   'menu.empty': '这个站点还没有保存的身份',
@@ -81,6 +87,7 @@ export const zhCN = {
   'panel.switched': '已切换到「{name}」',
   'panel.failed': '切换失败：{error}',
   'panel.close': '收起',
+  'panel.writeBackDone': '已把当前状态回写到「{name}」',
 
   'lock.locked': '已锁定',
   'lock.desc': '输入启动密码，查看保存在本机的身份',
@@ -109,6 +116,7 @@ export const zhCN = {
   'options.noMatchTitle': '没有匹配的结果',
   'options.noMatchDesc': '换个关键词试试。',
   'options.colName': '名称',
+  'options.dragHint': '拖动左侧图标可调整同一分组内的顺序',
   'options.colScope': '范围',
   'options.colCookie': 'Cookie',
   'options.colStorage': '存储在',
@@ -116,8 +124,26 @@ export const zhCN = {
   'options.scopeExact': '仅此域名',
   'options.scopeSubdomains': '含子域',
   'options.renameHint': '点击重命名',
+  'options.overwrite': '覆盖',
+  'options.overwriteHint': '用浏览器当前的 Cookie 覆盖此身份',
+  'options.overwriteStorage': '同时覆盖 localStorage 快照',
+  'options.overwriteStorageNote': '读取 {origin} 当前的值',
+  'options.overwriteStorageHint': '需要该站点有已打开的标签页，将读取它当前的 localStorage',
+  'options.history': '历史',
+  'options.historyHint': '查看此身份的历史快照',
+  'options.historyTitle': '「{name}」的历史快照',
+  'options.historyDesc':
+    '还原会把身份恢复成所选快照的样子；还原前会先把当前状态留成一份新快照。',
+  'options.historyEmpty': '还没有历史快照。开启「保留历史快照」后，回写或覆盖会自动留档。',
+  'options.historyReasonWriteBack': '切换回写',
+  'options.historyReasonOverwrite': '手动覆盖',
+  'options.historyReasonRestore': '还原前',
+  'options.historyCookies': '{count} 个 Cookie',
+  'options.historyRestore': '还原',
+  'options.historyRestored': '已还原「{name}」',
   'options.deleted': '已删除',
   'options.renamed': '已重命名',
+  'options.overwritten': '已覆盖「{name}」',
   'options.exported': '已导出 {count} 个身份',
   'options.importInvalid': '文件不是本插件导出的 JSON 格式',
   'options.importDone': '导入 {imported} 个身份，当前共 {total} 个',
@@ -159,6 +185,14 @@ export const zhCN = {
   'options.reloadAfterSwitchDesc': '不刷新的话，页面内存里的旧登录态仍然生效。',
   'options.reloadAllTabs': '同时刷新该站点其他标签页',
   'options.reloadAllTabsDesc': '只在同一浏览器窗口内匹配同主域标签页。',
+  'options.writeBack': '切换前回写当前身份',
+  'options.writeBackDesc':
+    '切换前先把浏览器里该身份最新的 Cookie 与 localStorage 存回快照，避免网站刷新过的登录态丢失。若已在网站上登出再切换，会把登出状态写回，开启「保留历史快照」后可在身份列表里还原。',
+  'options.historyEnabled': '保留历史快照',
+  'options.historyEnabledDesc':
+    '自动回写或手动覆盖身份之前，先把它的上一份状态留档；之后可以在身份列表里查看并还原。',
+  'options.historyLimit': '每个身份保留数量',
+  'options.historyLimitDesc': '最多保留 {max} 份，超出后自动丢弃最旧的一份。',
   'options.language': '语言',
   'options.languageDesc': '默认跟随浏览器语言，手动选择后会被记住。',
   'options.languageAuto': '跟随浏览器（{locale}）',
@@ -198,6 +232,8 @@ export const zhCN = {
     '右键菜单与悬浮窗默认关闭，可在「快捷入口」里开启；范围选「全部」时只在已有保存身份的站点出现，白名单 / 黑名单按域名匹配并自动包含子域。',
   'options.version': '版本 {version}',
   'options.importTitle': '导入 {count} 个身份',
+  'options.importSelectAll': '全选',
+  'options.importCookiesCount': '{count} 个 Cookie',
   'options.importMerge': '合并（保留现有）',
   'options.importReplace': '覆盖全部',
   'options.clearTitle': '清空全部身份？',
@@ -211,6 +247,7 @@ export const zhCN = {
   'warn.localStorageClear': 'localStorage 清理失败：{error}',
   'warn.storageOrigin': '快照的 localStorage 属于 {origin}，当前页面是 {current}，已跳过',
   'warn.parentCookies': '上级域 {parent} 还有 {count} 个 Cookie 未切换，登录态可能仍来自它们',
+  'warn.overwriteNoTab': '未找到该站点的标签页，localStorage 未刷新（Cookie 已更新）',
 
   'err.notWebPageSave': '当前标签页不是网页（http/https），无法读取 Cookie',
   'err.notWebPageSwitch': '当前标签页不是网页（http/https），无法切换',
@@ -232,6 +269,7 @@ export const zhCN = {
   'err.keyStoreUnavailable': '无法打开本地密钥库',
   'err.passwordTooShort': '启动密码至少 {count} 位',
   'err.currentPasswordRequired': '请先输入当前密码',
+  'err.snapshotMissing': '该历史快照已不存在',
 } as const;
 
 export type MessageKey = keyof typeof zhCN;

@@ -1,10 +1,18 @@
 import { t } from '@/shared/i18n';
-import { DEFAULT_SETTINGS, type Profile, type Settings } from '@/shared/types';
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_HISTORY_LIMIT,
+  MAX_HISTORY_LIMIT,
+  type Profile,
+  type Settings,
+} from '@/shared/types';
 import { seal, unseal, type SealedPayload } from './crypto';
 
 const VAULT_KEY = 'cps:vault';
 const LEGACY_PROFILES_KEY = 'cps:profiles';
 const SETTINGS_KEY = 'cps:settings';
+/** 「站点 → 当前生效身份 id」，只放进会话存储：浏览器重启即丢弃，不残留隐私数据 */
+const ACTIVE_KEY = 'cps:active';
 
 /** 串行化所有写操作，避免多个消息交错导致覆盖 */
 let queue: Promise<unknown> = Promise.resolve();
@@ -97,6 +105,12 @@ export async function loadSettings(): Promise<Settings> {
     'bottom-right',
   ];
   if (!corners.includes(settings.panelCorner)) settings.panelCorner = 'bottom-right';
+
+  // 历史快照数量来自旧版本或手工修改时，统一收敛到 1~10
+  const history = Math.round(settings.historyLimit as unknown as number);
+  settings.historyLimit = Number.isFinite(history)
+    ? Math.min(MAX_HISTORY_LIMIT, Math.max(1, history))
+    : DEFAULT_HISTORY_LIMIT;
   return settings;
 }
 
@@ -104,6 +118,35 @@ export async function persistSettings(patch: Partial<Settings>): Promise<Setting
   const next = { ...(await loadSettings()), ...patch };
   await chrome.storage.local.set({ [SETTINGS_KEY]: next });
   return next;
+}
+
+async function readSession<T>(key: string): Promise<T | undefined> {
+  const raw = await chrome.storage.session.get(key);
+  return raw[key] as T | undefined;
+}
+
+/**
+ * 切换回写必须先知道「现在浏览器里生效的是哪个身份」。
+ * 这个关系只存在会话存储里，扩展重载或浏览器重启后失效，
+ * 之后的切换就会因为查不到而跳过回写，不会拿旧数据去猜。
+ */
+export async function getActiveProfileId(site: string): Promise<string | null> {
+  const map = (await readSession<Record<string, string>>(ACTIVE_KEY)) ?? {};
+  return map[site] ?? null;
+}
+
+export async function rememberActiveProfile(site: string, profileId: string): Promise<void> {
+  const map = (await readSession<Record<string, string>>(ACTIVE_KEY)) ?? {};
+  map[site] = profileId;
+  await chrome.storage.session.set({ [ACTIVE_KEY]: map });
+}
+
+/** 在网页上登出后调用：浏览器里已不再是这个身份，回写必须跳过 */
+export async function forgetActiveProfile(site: string): Promise<void> {
+  const map = (await readSession<Record<string, string>>(ACTIVE_KEY)) ?? {};
+  if (!(site in map)) return;
+  delete map[site];
+  await chrome.storage.session.set({ [ACTIVE_KEY]: map });
 }
 
 export async function clearAllData(): Promise<number> {

@@ -1,9 +1,11 @@
 import {
+  appendHistory,
   cookieInScope,
   hostnameFromUrl as hostnameOf,
   normalizeHostname,
   originFromUrl,
   profileCoversHostname,
+  reorderProfiles,
   resolveSiteKey,
   siteKeyFromHostname,
   stripLeadingDot,
@@ -11,10 +13,12 @@ import {
 import { resolveCurrentLocale, setRuntimeLocale, t } from '@/shared/i18n';
 import { LOCKED_ERROR, type Request } from '@/shared/messages';
 import {
+  MAX_HISTORY_LIMIT,
   PANEL_POS_KEY,
   type ActiveContext,
   type CookieRecord,
   type ExportBundle,
+  type HistorySnapshot,
   type LockState,
   type PanelState,
   type PopupState,
@@ -23,6 +27,7 @@ import {
   type Scope,
   type StorageSnapshot,
   type SwitchResult,
+  type WriteBackInfo,
 } from '@/shared/types';
 import { applyCookies, clearCookies, collectCookies, countCookies, errorText } from './cookies';
 import { clearLocalStorage, readLocalStorage, writeLocalStorage } from './inject';
@@ -39,11 +44,14 @@ import { initQuickAccess, refreshContextMenu, refreshPanel, syncQuickAccess } fr
 import {
   alignStorageFormat,
   clearAllData,
+  forgetActiveProfile,
+  getActiveProfileId,
   loadProfiles,
   loadSettings,
   persistProfiles,
   persistSettings,
   purgeVault,
+  rememberActiveProfile,
   withLock,
 } from './storage';
 
@@ -73,6 +81,17 @@ function newId(): string {
   return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** 把身份此刻的状态拍成一份历史快照 */
+function snapshotOf(profile: Profile, reason: HistorySnapshot['reason']): HistorySnapshot {
+  return {
+    id: newId(),
+    createdAt: Date.now(),
+    reason,
+    cookies: profile.cookies,
+    storage: profile.storage,
+  };
+}
+
 async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id !== undefined) return tab;
@@ -88,6 +107,21 @@ async function resolveTab(input?: chrome.tabs.Tab): Promise<chrome.tabs.Tab | un
   if (!input || input.id === undefined) return getActiveTab();
   if (input.url) return input;
   return (await chrome.tabs.get(input.id).catch(() => undefined)) ?? input;
+}
+
+/** 找出与指定 origin 完全一致的已打开标签页，用于覆盖身份时重新采集 localStorage */
+async function findTabByOrigin(origin: string): Promise<chrome.tabs.Tab | undefined> {
+  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+  return tabs.find((tab) => tab.url !== undefined && originFromUrl(tab.url) === origin);
+}
+
+/** 找出任意一个落在该身份范围内的已打开标签页，用于首次把 localStorage 存进身份 */
+async function findTabForProfile(profile: Profile): Promise<chrome.tabs.Tab | undefined> {
+  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+  return tabs.find((tab) => {
+    const host = hostnameOf(tab.url);
+    return host !== null && profileCoversHostname(profile, host);
+  });
 }
 
 async function buildPopupState(): Promise<PopupState> {
@@ -131,11 +165,8 @@ async function buildPanelState(tabInput?: chrome.tabs.Tab): Promise<PanelState> 
   return {
     hostname,
     site,
-    profiles: hostname
-      ? all
-          .filter((profile) => profileCoversHostname(profile, hostname))
-          .sort((a, b) => b.updatedAt - a.updatedAt)
-      : [],
+    // 保持存储顺序：用户在悬浮窗里拖动的排序会持久化到这里
+    profiles: hostname ? all.filter((profile) => profileCoversHostname(profile, hostname)) : [],
   };
 }
 
@@ -199,7 +230,146 @@ async function saveProfile(input: {
     return created;
   });
 
+  // 刚保存的就是浏览器里的当前状态，记下来以便之后切换时回写
+  await rememberActiveProfile(profile.site, profile.id);
+
   return { ok: true, profile, cookieCount: cookies.length, storageCount, errors };
+}
+
+/**
+ * 用浏览器当前的 Cookie 覆盖已保存的身份（在设置页或弹窗对某个身份执行）。
+ * Cookie 直接按域名从浏览器读取，无需打开该站点；
+ * localStorage 仅在 includeStorage 为真、且能找到该站点标签页时才会刷新，
+ * 否则保留原快照并给出提示。身份本来没存 localStorage 时，也能借此补存一份。
+ */
+async function overwriteProfile(id: string, includeStorage: boolean): Promise<SaveResult> {
+  const list = await loadProfiles();
+  const target = list.find((item) => item.id === id);
+  if (!target) throw new Error(t('err.profileNotFound'));
+
+  const settings = await loadSettings();
+  const cookies = await collectCookies(target.site, target.scope);
+  const errors: string[] = [];
+  let storage = target.storage;
+  let storageCount = 0;
+
+  if (includeStorage) {
+    // 已有快照就沿用它的 origin，否则从该站点已打开的标签页里取一个 origin
+    const known = target.storage?.origin;
+    const tab = known
+      ? await findTabByOrigin(known)
+      : await findTabForProfile(target);
+    const origin = known ?? originFromUrl(tab?.url ?? null);
+    if (!tab?.id || !origin) {
+      errors.push(t('warn.overwriteNoTab'));
+    } else {
+      try {
+        const snapshot = await readLocalStorage(tab.id);
+        storage = { origin, localStorage: snapshot };
+        storageCount = Object.keys(snapshot).length;
+      } catch (error) {
+        errors.push(t('warn.localStorageRead', { error: errorText(error) }));
+      }
+    }
+  }
+
+  const updated = await withLock(async () => {
+    const current = await loadProfiles();
+    const item = current.find((entry) => entry.id === id);
+    if (!item) throw new Error(t('err.profileNotFound'));
+    // 覆盖前的状态先留档，用户之后可以在历史快照里还原
+    if (settings.historyEnabled) {
+      item.history = appendHistory(item.history, snapshotOf(item, 'overwrite'), settings.historyLimit);
+    }
+    item.cookies = cookies;
+    item.storage = storage;
+    item.updatedAt = Date.now();
+    await persistProfiles(current);
+    return item;
+  });
+
+  // 覆盖后浏览器里的状态就等于这个身份，同样需要记录
+  await rememberActiveProfile(updated.site, updated.id);
+
+  return { ok: true, profile: updated, cookieCount: cookies.length, storageCount, errors };
+}
+
+/**
+ * 切换前把浏览器里「当前生效身份」的最新登录态存回它的快照。
+ *
+ * 这样在网站上使用过程中被刷新的 Cookie / localStorage 不会因为一次切换而丢失。
+ * 找不到当前生效身份（扩展刚重载、从未切换过、已在该站点登出）时直接跳过，不做任何猜测。
+ * 覆盖前会把旧状态留成一份历史快照，用户之后可以在身份列表里还原。
+ */
+async function writeBackCurrentProfile(target: Profile): Promise<WriteBackInfo | undefined> {
+  const activeId = await getActiveProfileId(target.site);
+  if (!activeId || activeId === target.id) return undefined;
+
+  const current = (await loadProfiles()).find((item) => item.id === activeId);
+  if (!current) {
+    await forgetActiveProfile(target.site);
+    return undefined;
+  }
+
+  // 读取浏览器里的真实状态：Cookie 按该身份的站点范围，localStorage 取自同 origin 的标签页
+  const cookies = await collectCookies(current.site, current.scope);
+  let storage = current.storage;
+  if (current.storage) {
+    const tab = await findTabByOrigin(current.storage.origin);
+    if (tab?.id) {
+      try {
+        storage = { origin: current.storage.origin, localStorage: await readLocalStorage(tab.id) };
+      } catch {
+        // 页面禁止注入时保留原快照，回写失败不应该打断切换
+      }
+    }
+  }
+
+  const settings = await loadSettings();
+
+  await withLock(async () => {
+    const list = await loadProfiles();
+    const item = list.find((entry) => entry.id === current.id);
+    if (!item) return;
+    // 先把被覆盖的旧状态留档，再写入新状态
+    if (settings.historyEnabled) {
+      item.history = appendHistory(item.history, snapshotOf(item, 'writeBack'), settings.historyLimit);
+    }
+    item.cookies = cookies;
+    item.storage = storage;
+    item.updatedAt = Date.now();
+    await persistProfiles(list);
+  });
+
+  return { id: current.id, name: current.name };
+}
+
+/** 把一个历史快照还原成身份的当前状态；还原前先把现状留档，避免误操作后无法回头 */
+async function restoreHistory(id: string, snapshotId: string): Promise<{ name: string }> {
+  const settings = await loadSettings();
+
+  return withLock(async () => {
+    const list = await loadProfiles();
+    const item = list.find((entry) => entry.id === id);
+    if (!item) throw new Error(t('err.profileNotFound'));
+    const snapshot = (item.history ?? []).find((entry) => entry.id === snapshotId);
+    if (!snapshot) throw new Error(t('err.snapshotMissing'));
+
+    if (settings.historyEnabled) {
+      item.history = appendHistory(item.history, snapshotOf(item, 'restore'), settings.historyLimit);
+    }
+    item.cookies = snapshot.cookies;
+    item.storage = snapshot.storage;
+    item.updatedAt = Date.now();
+    await persistProfiles(list);
+    return { name: item.name };
+  });
+}
+
+/** 读取某个身份的历史快照列表（最新的在最前面） */
+async function profileHistory(id: string): Promise<HistorySnapshot[]> {
+  const list = await loadProfiles();
+  return list.find((item) => item.id === id)?.history ?? [];
 }
 
 async function reloadTabs(tabId: number, site: string, allSiteTabs: boolean): Promise<void> {
@@ -230,6 +400,13 @@ async function switchProfile(id: string, tabInput?: chrome.tabs.Tab): Promise<Sw
   if (!profileCoversHostname(profile, hostname)) {
     throw new Error(t('err.siteMismatch', { site: profile.site, host: hostname }));
   }
+
+  const settings = await loadSettings();
+
+  // 回写必须在清空之前做：先拿浏览器里当前身份的最新状态覆盖它的快照，再切到目标身份
+  const writeBack = settings.writeBackOnSwitch
+    ? await writeBackCurrentProfile(profile)
+    : undefined;
 
   const cleared = await clearCookies(profile.site, profile.scope);
   const applied = await applyCookies(profile.cookies);
@@ -269,7 +446,9 @@ async function switchProfile(id: string, tabInput?: chrome.tabs.Tab): Promise<Sw
   }
 
   const errors = [...cleared.errors, ...applied.errors];
-  const settings = await loadSettings();
+
+  // 记住这个站点当前生效的身份，下次切换时才知道该回写谁
+  await rememberActiveProfile(profile.site, profile.id);
 
   // 页面顶部横幅：让弹窗 / 右键菜单 / 悬浮窗三条入口都有同一个结果反馈
   await showPageNotice(
@@ -301,6 +480,7 @@ async function switchProfile(id: string, tabInput?: chrome.tabs.Tab): Promise<Sw
     storageNote,
     warnings,
     errors: errors.slice(0, 12),
+    writeBack,
   };
 }
 
@@ -374,6 +554,19 @@ async function renameProfile(id: string, name: string): Promise<Profile> {
     target.updatedAt = Date.now();
     await persistProfiles(list);
     return target;
+  });
+}
+
+/**
+ * 调整身份的排列顺序（弹窗或设置页拖动排序时调用）。
+ * 传入的是「当前拖动的那一组身份」的新顺序，它们原本占用的位置不变、其余身份原位不动，
+ * 因此同一个站点分组内的排序不会打乱别的身份。
+ */
+async function reorderProfileOrder(ids: string[]): Promise<{ order: string[] }> {
+  return withLock(async () => {
+    const next = reorderProfiles(await loadProfiles(), ids);
+    await persistProfiles(next);
+    return { order: next.map((item) => item.id) };
   });
 }
 
@@ -453,6 +646,27 @@ function sanitizeStorage(raw: unknown): StorageSnapshot | undefined {
   return { origin: snapshot.origin, localStorage: out };
 }
 
+/** 导入文件里的历史快照同样逐字段重建，避免带进非法内容 */
+function sanitizeHistory(raw: unknown, site: string, scope: Scope): HistorySnapshot[] {
+  if (!Array.isArray(raw)) return [];
+  const out: HistorySnapshot[] = [];
+  for (const item of raw.slice(0, MAX_HISTORY_LIMIT)) {
+    if (!item || typeof item !== 'object') continue;
+    const snapshot = item as Partial<HistorySnapshot>;
+    out.push({
+      id: typeof snapshot.id === 'string' && snapshot.id ? snapshot.id : newId(),
+      createdAt: typeof snapshot.createdAt === 'number' ? snapshot.createdAt : Date.now(),
+      reason:
+        snapshot.reason === 'overwrite' || snapshot.reason === 'restore'
+          ? snapshot.reason
+          : 'writeBack',
+      cookies: sanitizeCookies(snapshot.cookies, site, scope),
+      storage: sanitizeStorage(snapshot.storage),
+    });
+  }
+  return out;
+}
+
 function sanitizeProfile(value: unknown): Profile | null {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Partial<Profile>;
@@ -468,6 +682,7 @@ function sanitizeProfile(value: unknown): Profile | null {
   if (cookies.length === 0) return null;
 
   const now = Date.now();
+  const history = sanitizeHistory(raw.history, site, scope);
   return {
     id: typeof raw.id === 'string' && raw.id ? raw.id : newId(),
     name: typeof raw.name === 'string' && raw.name ? raw.name.slice(0, 120) : site,
@@ -475,6 +690,7 @@ function sanitizeProfile(value: unknown): Profile | null {
     scope,
     cookies,
     storage: sanitizeStorage(raw.storage),
+    history: history.length > 0 ? history : undefined,
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : now,
     updatedAt: now,
   };
@@ -500,6 +716,8 @@ async function importData(
       return { imported: incoming.length, total: incoming.length };
     }
     const byId = new Map(current.map((item) => [item.id, item]));
+    // 列表顺序即用户看到的顺序，新导入的放在最前面，与新建身份一致
+    const added: Profile[] = [];
     let imported = 0;
     for (const profile of incoming) {
       const duplicate = byId.get(profile.id);
@@ -507,10 +725,11 @@ async function importData(
         profile.id = newId();
         profile.name = uniqueName([...byId.values()], profile.site, profile.scope, profile.name);
       }
+      added.push(profile);
       byId.set(profile.id, profile);
       imported += 1;
     }
-    const merged = [...byId.values()];
+    const merged = [...added, ...current];
     await persistProfiles(merged);
     return { imported, total: merged.length };
   });
@@ -540,6 +759,9 @@ async function handle(
     case 'SAVE_PROFILE':
       return { ok: true, data: await saveProfile(request) };
 
+    case 'OVERWRITE_PROFILE':
+      return { ok: true, data: await overwriteProfile(request.id, request.includeStorage) };
+
     case 'SWITCH_PROFILE': {
       try {
         return { ok: true, data: await switchProfile(request.id, sender?.tab) };
@@ -554,6 +776,12 @@ async function handle(
       }
     }
 
+    case 'GET_PROFILE_HISTORY':
+      return { ok: true, data: await profileHistory(request.id) };
+
+    case 'RESTORE_HISTORY':
+      return { ok: true, data: await restoreHistory(request.id, request.snapshotId) };
+
     case 'DELETE_PROFILE':
       return { ok: true, data: await deleteProfile(request.id) };
 
@@ -563,10 +791,11 @@ async function handle(
     case 'RENAME_PROFILE':
       return { ok: true, data: await renameProfile(request.id, request.name) };
 
-    case 'GET_ALL_PROFILES': {
-      const list = await loadProfiles();
-      return { ok: true, data: [...list].sort((a, b) => b.updatedAt - a.updatedAt) };
-    }
+    case 'REORDER_PROFILES':
+      return { ok: true, data: await reorderProfileOrder(request.ids) };
+
+    case 'GET_ALL_PROFILES':
+      return { ok: true, data: await loadProfiles() };
 
     case 'EXPORT_DATA': {
       const bundle: ExportBundle = {
@@ -595,6 +824,8 @@ async function handle(
       }
 
       const outcome = await clearCookies(site, 'subdomains');
+      // 这里相当于在网页上登出：浏览器里已经没有生效身份，之后切换时不能再回写
+      await forgetActiveProfile(site);
       const errors = [...outcome.errors];
       let storageCleared = 0;
 
@@ -697,6 +928,8 @@ async function handle(
 /** 这些操作会改变右键菜单的内容或可用状态，成功后需要重建 */
 const MENU_AFFECTING: Request['type'][] = [
   'SAVE_PROFILE',
+  'OVERWRITE_PROFILE',
+  'RESTORE_HISTORY',
   'DELETE_PROFILE',
   'RENAME_PROFILE',
   'IMPORT_DATA',

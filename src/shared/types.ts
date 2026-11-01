@@ -137,6 +137,8 @@ export interface PopupState {
   context: ActiveContext;
   /** 与当前站点匹配的 Profile */
   profiles: Profile[];
+  /** 浏览器里当前生效的身份 id，用于在列表上打勾 */
+  activeProfileIds: string[];
   settings: Settings;
 }
 
@@ -145,6 +147,8 @@ export interface PanelState {
   hostname: string | null;
   site: string | null;
   profiles: Profile[];
+  /** 浏览器里当前生效的身份 id，用于在列表上打勾 */
+  activeProfileIds: string[];
 }
 
 /** 切换前发生过回写时返回，供界面提示回写了哪个身份 */

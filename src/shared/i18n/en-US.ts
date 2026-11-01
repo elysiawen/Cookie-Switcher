@@ -7,6 +7,7 @@ export const enUS: Record<MessageKey, string> = {
   'common.saving': 'Saving…',
   'common.loading': 'Loading…',
   'common.confirm': 'Confirm',
+  'common.activeHint': 'Currently active identity',
 
   'confirm.deleteTitle': 'Delete profile',
   'confirm.deleteDesc':

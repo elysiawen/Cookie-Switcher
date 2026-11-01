@@ -50,6 +50,8 @@ interface RowProps {
   busy: boolean;
   disabled: boolean;
   dragging: boolean;
+  /** 这个身份是否是浏览器里当前生效的登录态 */
+  active: boolean;
   onSwitch: () => void;
   onAskOverwrite: () => void;
   onAskDelete: () => void;
@@ -63,6 +65,7 @@ function ProfileRow({
   busy,
   disabled,
   dragging,
+  active,
   onSwitch,
   onAskOverwrite,
   onAskDelete,
@@ -95,8 +98,31 @@ function ProfileRow({
         <Avatar name={profile.name} />
         <span className="row-text">
           <span className="row-name">
-            {profile.name}
+            <span className="row-name-text" title={profile.name}>
+              {profile.name}
+            </span>
             {profile.storage && <span className="tag">+LS</span>}
+            {active && (
+              <span
+                className="active-check"
+                title={t('common.activeHint')}
+                aria-label={t('common.activeHint')}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="11"
+                  height="11"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M4.5 12.5l4.5 4.5L19.5 6.5" />
+                </svg>
+              </span>
+            )}
           </span>
           <span className="row-meta">
             {t('popup.rowMeta', {
@@ -647,6 +673,7 @@ export default function App() {
                     busy={busyId === profile.id}
                     disabled={!canOperate}
                     dragging={dragId === profile.id}
+                    active={state.activeProfileIds.includes(profile.id)}
                     onSwitch={() => void handleSwitch(profile)}
                     onAskOverwrite={() => setOverwriteId(profile.id)}
                     onAskDelete={() => setConfirmId(profile.id)}

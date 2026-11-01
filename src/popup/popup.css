@@ -259,20 +259,41 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 13px;
   font-weight: 550;
+}
+
+/* 名称过长时省略，保证勾选与 +LS 标签不会被挤压 */
+.row-name-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tag {
+  flex: 0 0 auto;
   font-size: 9.5px;
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* 当前生效身份的勾选标记 */
+.active-check {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ok);
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--ok-soft);
 }
 
 .row-meta {

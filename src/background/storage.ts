@@ -4,6 +4,7 @@ import {
   DEFAULT_HISTORY_LIMIT,
   MAX_HISTORY_LIMIT,
   type Profile,
+  type Scope,
   type Settings,
 } from '@/shared/types';
 import { seal, unseal, type SealedPayload } from './crypto';
@@ -130,23 +131,44 @@ async function readSession<T>(key: string): Promise<T | undefined> {
  * 这个关系只存在会话存储里，扩展重载或浏览器重启后失效，
  * 之后的切换就会因为查不到而跳过回写，不会拿旧数据去猜。
  */
+export async function loadActiveProfiles(): Promise<Record<string, string>> {
+  return (await readSession<Record<string, string>>(ACTIVE_KEY)) ?? {};
+}
+
 export async function getActiveProfileId(site: string): Promise<string | null> {
-  const map = (await readSession<Record<string, string>>(ACTIVE_KEY)) ?? {};
-  return map[site] ?? null;
+  return (await loadActiveProfiles())[site] ?? null;
 }
 
 export async function rememberActiveProfile(site: string, profileId: string): Promise<void> {
-  const map = (await readSession<Record<string, string>>(ACTIVE_KEY)) ?? {};
+  const map = await loadActiveProfiles();
   map[site] = profileId;
   await chrome.storage.session.set({ [ACTIVE_KEY]: map });
 }
 
 /** 在网页上登出后调用：浏览器里已不再是这个身份，回写必须跳过 */
 export async function forgetActiveProfile(site: string): Promise<void> {
-  const map = (await readSession<Record<string, string>>(ACTIVE_KEY)) ?? {};
+  const map = await loadActiveProfiles();
   if (!(site in map)) return;
   delete map[site];
   await chrome.storage.session.set({ [ACTIVE_KEY]: map });
+}
+
+/**
+ * 清除某个范围内的活跃身份记录。
+ * 清除本站 Cookie 等于是范围内所有站点都登出了，含子域时要把子域的记录一并清掉，
+ * 否则列表里会残留一个已经不再生效的勾选。
+ */
+export async function forgetActiveProfilesInScope(site: string, scope: Scope): Promise<void> {
+  const map = await loadActiveProfiles();
+  let changed = false;
+  for (const key of Object.keys(map)) {
+    const covered = scope === 'exact' ? key === site : key === site || key.endsWith('.' + site);
+    if (covered) {
+      delete map[key];
+      changed = true;
+    }
+  }
+  if (changed) await chrome.storage.session.set({ [ACTIVE_KEY]: map });
 }
 
 export async function clearAllData(): Promise<number> {

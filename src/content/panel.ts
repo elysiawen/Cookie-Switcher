@@ -41,6 +41,7 @@ function applyScale(percent: number | undefined): void {
 function buildStyle(): string {
   const listMax = Math.round(208 * (size / BASE_SIZE));
   const avatar = Math.round(22 * (size / BASE_SIZE));
+  const tick = Math.round(16 * (size / BASE_SIZE));
 
   return `
 :host { all: initial; }
@@ -174,6 +175,17 @@ function buildStyle(): string {
   white-space: nowrap;
 }
 .meta { display: block; font-size: 10px; color: #8a90a2; }
+.active {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: ${tick}px;
+  height: ${tick}px;
+  border-radius: 50%;
+  background: #0f9960;
+  color: #fff;
+  box-shadow: 0 0 0 2px #eafaf1;
+}
 .spinner {
   flex: 0 0 auto;
   width: 12px;
@@ -396,6 +408,16 @@ function buildRow(profile: Profile): HTMLButtonElement {
 
   row.append(avatar, text);
 
+  if (data?.activeProfileIds.includes(profile.id)) {
+    const check = document.createElement('span');
+    check.className = 'active';
+    check.title = t('common.activeHint');
+    check.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none"
+      stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"
+      aria-hidden="true"><path d="M4.5 12.5l4.5 4.5L19.5 6.5"/></svg>`;
+    row.appendChild(check);
+  }
+
   if (busyId === profile.id) {
     const spinner = document.createElement('span');
     spinner.className = 'spinner';
@@ -445,7 +467,8 @@ async function switchTo(profile: Profile): Promise<void> {
       ? t('panel.writeBackDone', { name: writeBack.name })
       : t('panel.switched', { name: result.data.profileName }),
   );
-  renderRows();
+  // 重新拉取列表，让勾选状态跟随后台记录的活跃身份
+  await refreshList();
 }
 
 function openCard(): void {

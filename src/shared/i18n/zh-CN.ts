@@ -9,6 +9,7 @@ export const zhCN = {
   'common.saving': '保存中…',
   'common.loading': '正在读取…',
   'common.confirm': '确认',
+  'common.activeHint': '当前生效的身份',
 
   'confirm.deleteTitle': '确认删除',
   'confirm.deleteDesc': '「{name}」的 Cookie 快照会从本机删除，此操作不可撤销。',

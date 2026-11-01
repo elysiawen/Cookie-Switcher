@@ -7,6 +7,7 @@ export const jaJP: Record<MessageKey, string> = {
   'common.saving': '保存中…',
   'common.loading': '読み込み中…',
   'common.confirm': '確認',
+  'common.activeHint': '現在有効な識別情報',
 
   'confirm.deleteTitle': '削除の確認',
   'confirm.deleteDesc':

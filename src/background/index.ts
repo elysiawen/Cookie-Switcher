@@ -45,7 +45,9 @@ import {
   alignStorageFormat,
   clearAllData,
   forgetActiveProfile,
+  forgetActiveProfilesInScope,
   getActiveProfileId,
+  loadActiveProfiles,
   loadProfiles,
   loadSettings,
   persistProfiles,
@@ -124,12 +126,28 @@ async function findTabForProfile(profile: Profile): Promise<chrome.tabs.Tab | un
   });
 }
 
+/**
+ * 找出列表里应该打勾的身份。
+ * 活跃记录按身份的 site 分开存，同一页面可能同时命中注册主域与完整 hostname 两条；
+ * 这种重叠情况下取 site 更具体的那一个，保证界面上只有一个勾。
+ */
+function resolveActiveProfileIds(
+  profiles: Profile[],
+  active: Record<string, string>,
+): string[] {
+  const matched = profiles.filter((profile) => active[profile.site] === profile.id);
+  if (matched.length <= 1) return matched.map((profile) => profile.id);
+  const best = matched.reduce((a, b) => (a.site.length >= b.site.length ? a : b));
+  return [best.id];
+}
+
 async function buildPopupState(): Promise<PopupState> {
   const tab = await getActiveTab();
   const hostname = hostnameOf(tab?.url);
   const site = hostname ? siteKeyFromHostname(hostname) : null;
   const all = await loadProfiles();
   const settings = await loadSettings();
+  const active = await loadActiveProfiles();
 
   let liveCookieCount = 0;
   if (site) {
@@ -150,9 +168,13 @@ async function buildPopupState(): Promise<PopupState> {
     injectable: Boolean(tab?.id) && Boolean(hostname),
   };
 
+  const profiles = hostname ? all.filter((profile) => profileCoversHostname(profile, hostname)) : [];
+
   return {
     context,
-    profiles: hostname ? all.filter((profile) => profileCoversHostname(profile, hostname)) : [],
+    profiles,
+    // 身份的 site 可能是完整 hostname（仅此域名）或注册主域，逐个对照活跃记录
+    activeProfileIds: resolveActiveProfileIds(profiles, active),
     settings,
   };
 }
@@ -162,11 +184,14 @@ async function buildPanelState(tabInput?: chrome.tabs.Tab): Promise<PanelState> 
   const hostname = hostnameOf(tab?.url);
   const site = hostname ? siteKeyFromHostname(hostname) : null;
   const all = hostname ? await loadProfiles() : [];
+  const active = await loadActiveProfiles();
+  const profiles = hostname ? all.filter((profile) => profileCoversHostname(profile, hostname)) : [];
   return {
     hostname,
     site,
     // 保持存储顺序：用户在悬浮窗里拖动的排序会持久化到这里
-    profiles: hostname ? all.filter((profile) => profileCoversHostname(profile, hostname)) : [],
+    profiles,
+    activeProfileIds: resolveActiveProfileIds(profiles, active),
   };
 }
 
@@ -824,8 +849,8 @@ async function handle(
       }
 
       const outcome = await clearCookies(site, 'subdomains');
-      // 这里相当于在网页上登出：浏览器里已经没有生效身份，之后切换时不能再回写
-      await forgetActiveProfile(site);
+      // 这里相当于在网页上登出：范围内已没有生效身份，之后切换时不能再回写，列表勾选也要取消
+      await forgetActiveProfilesInScope(site, 'subdomains');
       const errors = [...outcome.errors];
       let storageCleared = 0;
 
